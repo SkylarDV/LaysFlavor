@@ -140,12 +140,49 @@
         padding-right: 100px;
         z-index: 30; 
         pointer-events: none; }
+
+      /* Loading overlay */
+      #loadingOverlay {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(180deg, #ffc800 0%, #ffd85a 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+      }
+      .loading-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 24px 28px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-weight: 700;
+        color: #333;
+      }
+      .loading-spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid rgba(0,0,0,0.12);
+        border-top-color: #ffc800;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
     </style>
   </head>
   <body>
+    <div id="loadingOverlay" aria-label="Loading">
+      <div class="loading-card">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <div>Loading your flavor laboratory…</div>
+      </div>
+    </div>
     <div id="dragHint">Drag horizontally to look around</div>
     <div id="menu" aria-label="Controls">
-      <h1>Lays Flavor</h1>
+      <h1>Your Lays Flavor</h1>
 
       <div class="menu-section active" id="section1">
         <div class="section">
@@ -257,7 +294,8 @@
       confirmSubmit.addEventListener('click', () => {
         console.log('Form submitted!');
         submitModal.classList.remove('active');
-        alert('Thank you for submitting your flavor!');
+        // Trigger bag spin + fade animation in three.js
+        window.dispatchEvent(new CustomEvent('bag-spinout'));
       });
       
       dropZone.addEventListener('click', () => bagImageInput.click());
@@ -286,6 +324,14 @@
           bagImageInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
       }, false);
+
+      // Hide loading overlay ~2 seconds after page load
+      window.addEventListener('load', () => {
+        const overlay = document.getElementById('loadingOverlay');
+        setTimeout(() => {
+          if (overlay) overlay.style.display = 'none';
+        }, 2000);
+      });
     </script>
   </body>
 </html>

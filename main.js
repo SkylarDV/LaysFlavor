@@ -192,7 +192,7 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
     model.traverse((n) => {
         if (n.isMesh) { // 1: bag 2: lays logo 3: text 4: image
             if (!bagAssigned) {
-                bagMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color(getBagColor()), metalness: 0.1, roughness: 0.3 });
+                bagMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color(getBagColor()), metalness: 0.1, roughness: 0.3, transparent: true, opacity: 1 });
                 n.material = bagMaterial;
                 bagAssigned = true;
             }
@@ -368,6 +368,65 @@ window.addEventListener('resize', () => {
     }
     renderer.render(scene, camera);
 })();
+
+// Fast spin + fade out on submit confirm
+let spinoutActive = false;
+let spinoutStart = 0;
+const SPINOUT_DURATION = 900; // ms
+const SPINOUT_SPEED = 8.0; // radians per second
+const SPINOUT_LIFT = 0.35; // units to move up during spin
+let spinoutStartY = 0;
+
+window.addEventListener('bag-spinout', () => {
+    if (!model) return;
+    spinoutActive = true;
+    spinoutStart = performance.now();
+    spinoutStartY = model.position.y;
+    // ensure all materials can fade
+    model.traverse((n) => {
+        if (n.isMesh && n.material) {
+            const mat = n.material;
+            if (Array.isArray(mat)) {
+                mat.forEach(m => { m.transparent = true; m.opacity = 1; });
+            } else {
+                mat.transparent = true;
+                mat.opacity = 1;
+            }
+        }
+    });
+});
+
+// overlay animation step into render loop
+const _origRender = renderer.render.bind(renderer);
+renderer.render = (sc, cam) => {
+    if (spinoutActive && model) {
+        const now = performance.now();
+        const t = Math.min(1, (now - spinoutStart) / SPINOUT_DURATION);
+        // spin
+        model.rotation.y += SPINOUT_SPEED * (1/60); // approximate per-frame step
+        // lift up slightly using ease-out
+        const lift = SPINOUT_LIFT * (t * (2 - t));
+        model.position.y = spinoutStartY + lift;
+        // fade
+        const alpha = 1 - t;
+        model.traverse((n) => {
+            if (n.isMesh && n.material) {
+                const mat = n.material;
+                if (Array.isArray(mat)) {
+                    mat.forEach(m => { m.opacity = alpha; });
+                } else {
+                    mat.opacity = alpha;
+                }
+            }
+        });
+        if (t >= 1) {
+            spinoutActive = false;
+            model.visible = false;
+            model.position.y = spinoutStartY;
+        }
+    }
+    _origRender(sc, cam);
+};
 
 // Image upload to layer 4 (cover one side, crop overflow)
 const bagImageInputEl = document.getElementById('bagImage');
