@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -42,7 +43,7 @@ window.addEventListener('load', () => updateRendererViewport());
 const scene = new THREE.Scene();
 
 const params = {
-    envPath: '/assets/env.png',
+    envPath: '/assets/background.hdr',
 };
 
 const defaultBackground = '#dddddd';
@@ -65,22 +66,38 @@ const pmremGenerator = new THREE.PMREMGenerator(renderer);
 pmremGenerator.compileEquirectangularShader();
 
 let currentEnvMap = null; 
+let skyMesh = null;
 
 function loadEnvironment(path) {
-    const loader = new THREE.TextureLoader();
-    loader.load(path, (texture) => {
-        texture.encoding = THREE.sRGBEncoding;
-        texture.mapping = THREE.EquirectangularReflectionMapping;
-
-        const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+    const loader = new RGBELoader();
+    loader.load(path, (hdr) => {
+        hdr.mapping = THREE.EquirectangularReflectionMapping;
+        const envMap = pmremGenerator.fromEquirectangular(hdr).texture;
 
         if (currentEnvMap && currentEnvMap !== envMap) {
             currentEnvMap.dispose();
         }
         currentEnvMap = envMap;
-        scene.environment = envMap;
+        scene.environment = envMap; // reflections/light (unrotated)
 
- 
+        // Build a skydome with the HDR texture so we can rotate view
+        if (skyMesh) {
+            scene.remove(skyMesh);
+            skyMesh.geometry.dispose();
+            skyMesh.material.dispose();
+            skyMesh = null;
+        }
+        const skyGeo = new THREE.SphereGeometry(100, 64, 64);
+        const skyMat = new THREE.MeshBasicMaterial({
+            map: hdr,
+            side: THREE.BackSide,
+            toneMapped: false,
+        });
+        skyMesh = new THREE.Mesh(skyGeo, skyMat);
+        skyMesh.rotation.y = Math.PI / 2; // rotate 90° to the left
+        scene.add(skyMesh);
+        // Remove default flat color background so skydome is visible
+        scene.background = null;
     }, undefined, (err) => console.error('Error loading env texture:', err));
 }
 
@@ -164,9 +181,9 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
 
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
-    model.scale.setScalar((1 / maxDim) * 1.5);
+    model.scale.setScalar((1 / maxDim) * 2);
 
-    model.position.set(0, 0.5, 0.5);
+    model.position.set(-0.25, 0.5, -0.75);
     model.rotation.x = Math.PI / 12;
     model.rotation.y = yawBase;
 
@@ -345,6 +362,10 @@ window.addEventListener('resize', () => {
 
 (function animate() {
     requestAnimationFrame(animate);
+    // Keep skydome centered on camera so it appears as background
+    if (skyMesh && camera) {
+        skyMesh.position.copy(camera.position);
+    }
     renderer.render(scene, camera);
 })();
 
