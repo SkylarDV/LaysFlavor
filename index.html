@@ -52,32 +52,33 @@
       #menu .section {
         background: #ffffff;
         border-radius: 12px;
-        padding: 14px;
+        padding: 24px;
         box-shadow: 0 8px 24px rgba(11,11,11,0.06);
         color: #222;
         font-size: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
       }
 
       #menu .section strong {
         display:block;
-        margin-bottom:8px;
         color:#111;
         font-weight:700;
         font-size:13px;
       }
 
-      #menu label { display:block; font-size:13px; color:#333; margin-top:8px; }
-      #menu input[type="text"], #menu textarea, #menu select {
+      #menu label { display:block; font-size:13px; color:#333; margin-bottom:6px; }
+      #menu input[type="text"], #menu input[type="email"], #menu textarea, #menu select {
         width:100%;
         box-sizing:border-box;
-        padding:8px 10px;
-        margin-top:6px;
+        padding:10px 12px;
         border-radius:10px;
         border:1px solid rgba(0,0,0,0.08);
         background:#fff;
         font-size:14px;
       }
-      #menu textarea { min-height:20px; resize:vertical; }
+      #menu textarea { min-height:80px; resize:vertical; }
       #menu input[type="color"]{
         width:64px;
         height:36px;
@@ -99,27 +100,53 @@
       #menu::-webkit-scrollbar { width:10px; }
       #menu::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius:8px; }
 
+      .menu-section { display:none; }
+      .menu-section.active { display:flex; flex-direction:column; gap:18px; }
+      #nextBtn { padding:10px 20px; background:#ffffff; border:none; border-radius:8px; cursor:pointer; font-weight:600; align-self:flex-end; }
+      #nextBtn:hover { background:#f0f0f0; }
+
+      #submitBtn { padding:10px 20px; background:#ffffff; border:none; border-radius:8px; cursor:pointer; font-weight:600; align-self:flex-end; }
+      #submitBtn:hover { background:#f0f0f0; }
+      
+      .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center; }
+      .modal.active { display:flex; }
+      .modal-content { background:#fff; padding:40px; border-radius:12px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.3); }
+      .modal-content h2 { margin:0 0 20px 0; font-size:18px; }
+      .modal-buttons { display:flex; gap:12px; justify-content:center; margin-top:24px; }
+      .modal-btn { padding:10px 24px; border:none; border-radius:8px; cursor:pointer; font-weight:600; }
+      .modal-btn.confirm { background:#ffc800; color:#333; }
+      .modal-btn.confirm:hover { background:#ffb700; }
+      .modal-btn.cancel { background:#ddd; color:#333; }
+      .modal-btn.cancel:hover { background:#ccc; }
+
+      #bagImage { display:none; }
+      .drop-zone { border:2px dashed rgba(0,0,0,0.2); border-radius:8px; padding:30px; text-align:center; cursor:pointer; transition: all 0.2s ease; background:#f9f9f9; }\n      .drop-zone:hover, .drop-zone.dragover { border-color:#ffc800; background:#fff9e6; }
+      .drop-zone-text { font-size:13px; color:#666; }
+
       canvas { display:block; }
+      #dragHint { 
+        position: fixed; 
+        bottom: 100px; 
+        left: 50%; 
+        transform: translateX(-50%); 
+        background: rgba(0, 0, 0, 0.6); 
+        color: #ffffff; 
+        padding: 12px 24px; 
+        border-radius: 8px; 
+        font-size: 14px; 
+        padding-right: 100px;
+        z-index: 30; 
+        pointer-events: none; }
     </style>
   </head>
   <body>
+    <div id="dragHint">Drag horizontally to look around</div>
     <div id="menu" aria-label="Controls">
       <h1>Lays Flavor</h1>
 
-      <div class="section">
-        <div>Chips bag — drag horizontally to rotate</div>
-      </div>
-
-      <div class="section">
-        <strong>Bag Details</strong>
-
-        <label for="flavorName">Flavor Name</label>
-        <input id="flavorName" type="text" value="Classic" placeholder="e.g. Classic">
-
-        <label for="flavorDesc">Flavor Description</label>
-        <textarea id="flavorDesc" placeholder="Short description of the flavor"></textarea>
-
-        <div class="colorInputs" style="display:flex; gap:12px; align-items:center; margin-top:8px; flex-direction:column;">
+      <div class="menu-section active" id="section1">
+        <div class="section">
+          <strong>Color & Image</strong>
           <label style="align-self:flex-start;">Bag Color</label>
           <div id="bagColorSwatches" class="color-swatches" role="group" aria-label="Bag colors">
             <button class="color-swatch" data-color="#a41010" style="background:#a41010;"></button>
@@ -143,22 +170,115 @@
             <button class="color-swatch" data-color="#7b7b7b" style="background:#7b7b7b;"></button>
             <button class="color-swatch" data-color="#ffffff" style="background:#ffffff;"></button>
           </div>
+          <label for="bagImage">Bag Image</label>
+          <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-text">Drag and drop image here or click to select</div>
+          </div>
+          <input id="bagImage" type="file" accept="image/*">
         </div>
+        <button id="nextBtn">Next</button>
+      </div>
 
+      <div class="menu-section" id="section2">
+        <div class="section">
+          <strong>Name, Font & Description</strong>
+          <label for="flavorName">Flavor Name</label>
+          <input id="flavorName" type="text" value="Classic" placeholder="e.g. Classic">
+          <label for="bagFont">Font</label>
+          <select id="bagFont">
+            <option value="arial">Arial</option>
+            <option value="helvetica">Helvetica Neue</option>
+            <option value="roboto">Roboto</option>
+            <option value="oswald">Oswald</option>
+          </select>
+          <label for="flavorDesc">Flavor Description</label>
+          <textarea id="flavorDesc" placeholder="Short description of the flavor"></textarea>
+        </div>
+        <button id="nextBtn">Next</button>
+      </div>
 
-        <label for="bagImage">Bag Image</label>
-        <input id="bagImage" type="file" accept="image/*">
+      <div class="menu-section" id="section3">
+        <div class="section">
+          <strong>Creator Information</strong>
+          <p>This will be a login once the API gets implemented</p>
+        </div>
+        <button id="submitBtn">Submit</button>
+      </div>
+    </div>
 
-        <label for="bagFont">Font</label>
-        <select id="bagFont">
-          <option value="arial">Arial</option>
-          <option value="helvetica">Helvetica Neue</option>
-          <option value="roboto">Roboto</option>
-          <option value="oswald">Oswald</option>
-        </select>
+    <div id="submitModal" class="modal">
+      <div class="modal-content">
+        <h2>Are you sure you're finished?</h2>
+        <div class="modal-buttons">
+          <button class="modal-btn confirm" id="confirmSubmit">Yes, Submit</button>
+          <button class="modal-btn cancel" id="cancelSubmit">Cancel</button>
+        </div>
       </div>
     </div>
 
     <script type="module" src="/main.js"></script>
+    <script>
+      let currentSection = 1;
+      const nextBtns = document.querySelectorAll('#nextBtn');
+      const dragHint = document.getElementById('dragHint');
+      nextBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (currentSection === 1) {
+            dragHint.style.display = 'none';
+          }
+          document.getElementById(`section${currentSection}`).classList.remove('active');
+          currentSection = currentSection < 3 ? currentSection + 1 : 1;
+          document.getElementById(`section${currentSection}`).classList.add('active');
+        });
+      });
+
+      const dropZone = document.getElementById('dropZone');
+      const bagImageInput = document.getElementById('bagImage');
+      const submitBtn = document.getElementById('submitBtn');
+      const submitModal = document.getElementById('submitModal');
+      const confirmSubmit = document.getElementById('confirmSubmit');
+      const cancelSubmit = document.getElementById('cancelSubmit');
+      
+      submitBtn.addEventListener('click', () => {
+        submitModal.classList.add('active');
+      });
+      
+      cancelSubmit.addEventListener('click', () => {
+        submitModal.classList.remove('active');
+      });
+      
+      confirmSubmit.addEventListener('click', () => {
+        console.log('Form submitted!');
+        submitModal.classList.remove('active');
+        alert('Thank you for submitting your flavor!');
+      });
+      
+      dropZone.addEventListener('click', () => bagImageInput.click());
+      
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+      });
+      
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+      });
+      
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+      });
+      
+      dropZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          bagImageInput.files = files;
+          bagImageInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }, false);
+    </script>
   </body>
 </html>
