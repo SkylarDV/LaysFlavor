@@ -116,6 +116,7 @@ scene.add(ground);
 
 let model = null;
 let bagMaterial = null;
+let textMesh = null;
 new GLTFLoader().load('/assets/chips.glb', (g) => {
     model = g.scene;
 
@@ -132,6 +133,7 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
     model.rotation.y = yawBase;
 
     let bagAssigned = false;
+    let meshIndex = 0;
     model.traverse((n) => {
         if (n.isMesh) { // 1: bag 2: lays logo 3: text 4: image
             if (!bagAssigned) {
@@ -139,12 +141,24 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
                 n.material = bagMaterial;
                 bagAssigned = true;
             }
+            if (meshIndex === 2) {
+                textMesh = n;
+                textMesh.material = new THREE.MeshStandardMaterial({ 
+                    transparent: true, 
+                    opacity: 0,
+                    metalness: 0.1, 
+                    roughness: 0.3 
+                });
+            }
+            meshIndex++;
             n.castShadow = true;
             n.receiveShadow = true;
         }
     });
 
     scene.add(model);
+    // Render default text immediately so it's visible before typing
+    updateFlavorText('Classic');
 }, undefined, (err) => console.error('Error loading GLB:', err));
 
 if (bagColorSwatches.length) {
@@ -155,6 +169,72 @@ if (bagColorSwatches.length) {
                 bagMaterial.color.set(btn.dataset.color);
             }
         });
+    });
+}
+
+const flavorNameInput = document.getElementById('flavorName');
+const bagFontSelect = document.getElementById('bagFont');
+
+const FONT_STACKS = {
+    // standard: Helvetica-first stack with sensible fallbacks
+    standard: 'bold 400px "Helvetica Neue", Helvetica, Arial, "Segoe UI", system-ui, sans-serif',
+    // decorative: more legible handwritten/script options with fallbacks
+    decorative: 'bold 400px "Segoe Script", "Kaushan Script", "Courgette", "Sacramento", cursive',
+    // classic: readable serif stack for a traditional vibe
+    classic: 'bold 400px Georgia, "Times New Roman", Times, serif'
+};
+
+function resolveFontStack(alias) {
+    return FONT_STACKS[alias] || FONT_STACKS.standard;
+}
+
+function updateFlavorText(text) {
+    if (!textMesh) return;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 2048;
+    canvas.height = 1024;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.scale(1, -1.5); // flip vertical only
+    ctx.fillStyle = '#000000';
+    const selectedAlias = bagFontSelect ? bagFontSelect.value : 'standard';
+    ctx.font = resolveFontStack(selectedAlias);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text || '', canvas.width / 2, -canvas.height / 2);
+    ctx.restore();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    textMesh.material = new THREE.MeshStandardMaterial({
+        map: texture,
+        metalness: 0.1,
+        roughness: 0.3,
+        transparent: true,
+        alphaTest: 0.1
+    });
+}
+
+if (flavorNameInput) {
+    flavorNameInput.addEventListener('input', (e) => {
+        updateFlavorText(e.target.value);
+    });
+    
+    setTimeout(() => {
+        if (textMesh && flavorNameInput.value) {
+            updateFlavorText(flavorNameInput.value);
+        }
+    }, 100);
+}
+
+if (bagFontSelect) {
+    bagFontSelect.addEventListener('change', () => {
+        if (flavorNameInput) {
+            updateFlavorText(flavorNameInput.value);
+        }
     });
 }
 
