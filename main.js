@@ -47,6 +47,15 @@ const params = {
 const defaultBackground = '#dddddd';
 scene.background = new THREE.Color(defaultBackground);
 
+const bagColorSwatches = Array.from(document.querySelectorAll('.color-swatch'));
+const getBagColor = () => {
+    const selected = document.querySelector('.color-swatch.selected');
+    return selected ? selected.dataset.color : '#ff6666';
+};
+const markSelectedSwatch = (btn) => {
+    bagColorSwatches.forEach(b => b.classList.toggle('selected', b === btn));
+};
+
 const yawBase = Math.PI / 6;        
 const yawHalfRange = Math.PI / 3;  
 const clampYaw = (y) => Math.min(yawBase + yawHalfRange, Math.max(yawBase - yawHalfRange, y));
@@ -106,6 +115,7 @@ ground.receiveShadow = true;
 scene.add(ground);
 
 let model = null;
+let bagMaterial = null;
 new GLTFLoader().load('/assets/chips.glb', (g) => {
     model = g.scene;
 
@@ -121,8 +131,14 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
     model.rotation.x = Math.PI / 9;
     model.rotation.y = yawBase;
 
+    let bagAssigned = false;
     model.traverse((n) => {
-        if (n.isMesh) {
+        if (n.isMesh) { // 1: bag 2: lays logo 3: text 4: image
+            if (!bagAssigned) {
+                bagMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color(getBagColor()), metalness: 0.1, roughness: 0.3 });
+                n.material = bagMaterial;
+                bagAssigned = true;
+            }
             n.castShadow = true;
             n.receiveShadow = true;
         }
@@ -130,6 +146,17 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
 
     scene.add(model);
 }, undefined, (err) => console.error('Error loading GLB:', err));
+
+if (bagColorSwatches.length) {
+    bagColorSwatches.forEach(btn => {
+        btn.addEventListener('click', () => {
+            markSelectedSwatch(btn);
+            if (bagMaterial) {
+                bagMaterial.color.set(btn.dataset.color);
+            }
+        });
+    });
+}
 
 let dragging = false, px = 0, py = 0;
 renderer.domElement.style.touchAction = 'none';

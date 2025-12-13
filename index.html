@@ -86,6 +86,9 @@
         background:transparent;
         margin-top:6px;
       }
+      .color-swatches { display:grid; grid-template-columns: repeat(10, 1fr); gap:8px; width:100%; }
+      .color-swatch { height:28px; border-radius:6px; border:1px solid rgba(0,0,0,0.12); cursor:pointer; transition: transform 0.05s ease, box-shadow 0.1s ease; }
+      .color-swatch.selected { outline:2px solid #222; outline-offset:2px; box-shadow:0 0 0 2px rgba(0,0,0,0.08); transform: translateY(-1px); }
       #menu input[type="file"] {
         margin-top:8px;
         font-size:13px;
@@ -116,9 +119,30 @@
         <label for="flavorDesc">Flavor Description</label>
         <textarea id="flavorDesc" placeholder="Short description of the flavor"></textarea>
 
-        <div class="colorInputs" style="display:flex; gap:12px; align-items:center; margin-top:8px;">
-          <label for="bagColor">Bag Color</label>
-          <input id="bagColor" type="color" value="#ffcc00">
+        <div class="colorInputs" style="display:flex; gap:12px; align-items:center; margin-top:8px; flex-direction:column;">
+          <label style="align-self:flex-start;">Bag Color</label>
+          <div id="bagColorSwatches" class="color-swatches" role="group" aria-label="Bag colors">
+            <button class="color-swatch" data-color="#a41010" style="background:#a41010;"></button>
+            <button class="color-swatch" data-color="#cc5500" style="background:#cc5500;"></button>
+            <button class="color-swatch" data-color="#8f6a0c" style="background:#8f6a0c;"></button>
+            <button class="color-swatch" data-color="#0f6b2b" style="background:#0f6b2b;"></button>
+            <button class="color-swatch" data-color="#108b8b" style="background:#108b8b;"></button>
+            <button class="color-swatch" data-color="#0b3d91" style="background:#0b3d91;"></button>
+            <button class="color-swatch" data-color="#6e329e" style="background:#6e329e;"></button>
+            <button class="color-swatch" data-color="#c03384" style="background:#c03384;"></button>
+            <button class="color-swatch" data-color="#212121" style="background:#212121;"></button>
+            <button class="color-swatch" data-color="#cccccc" style="background:#cccccc;"></button>
+            <button class="color-swatch" data-color="#ff6666" style="background:#ff6666;"></button>
+            <button class="color-swatch" data-color="#f7a831" style="background:#f7a831;"></button>
+            <button class="color-swatch" data-color="#ffea70" style="background:#ffea70;"></button>
+            <button class="color-swatch" data-color="#6dd17c" style="background:#6dd17c;"></button>
+            <button class="color-swatch" data-color="#62d6d6" style="background:#62d6d6;"></button>
+            <button class="color-swatch" data-color="#5f8cc4" style="background:#5f8cc4;"></button>
+            <button class="color-swatch" data-color="#b58de7" style="background:#b58de7;"></button>
+            <button class="color-swatch" data-color="#ff99cc" style="background:#ff99cc;"></button>
+            <button class="color-swatch" data-color="#7b7b7b" style="background:#7b7b7b;"></button>
+            <button class="color-swatch" data-color="#ffffff" style="background:#ffffff;"></button>
+          </div>
         </div>
 
 
