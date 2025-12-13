@@ -117,6 +117,7 @@ scene.add(ground);
 let model = null;
 let bagMaterial = null;
 let textMesh = null;
+let imageMesh = null;
 new GLTFLoader().load('/assets/chips.glb', (g) => {
     model = g.scene;
 
@@ -148,6 +149,15 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
                     opacity: 0,
                     metalness: 0.1, 
                     roughness: 0.3 
+                });
+            }
+            if (meshIndex === 3) {
+                imageMesh = n;
+                imageMesh.material = new THREE.MeshStandardMaterial({
+                    transparent: true,
+                    opacity: 0,
+                    metalness: 0.1,
+                    roughness: 0.3,
                 });
             }
             meshIndex++;
@@ -269,3 +279,52 @@ window.addEventListener('resize', () => {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
 })();
+
+// Image upload to layer 4 (cover one side, crop overflow)
+const bagImageInputEl = document.getElementById('bagImage');
+if (bagImageInputEl) {
+    bagImageInputEl.addEventListener('change', () => {
+        const file = bagImageInputEl.files && bagImageInputEl.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                // Use the same target aspect as text layer for consistency
+                const canvasW = 2048;
+                const canvasH = 1024;
+                const canvas = document.createElement('canvas');
+                canvas.width = canvasW;
+                canvas.height = canvasH;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvasW, canvasH);
+
+                // Flip vertically to match model UV orientation
+                ctx.save();
+                ctx.translate(0, canvasH);
+                ctx.scale(1, -1);
+
+                // Cover algorithm: no squish, fill at least one side fully
+                const scale = Math.max(canvasW / img.naturalWidth, canvasH / img.naturalHeight);
+                const drawW = img.naturalWidth * scale;
+                const drawH = img.naturalHeight * scale;
+                const dx = (canvasW - drawW) / 2;
+                const dy = (canvasH - drawH) / 2;
+                ctx.drawImage(img, dx, dy, drawW, drawH);
+                ctx.restore();
+
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.encoding = THREE.sRGBEncoding;
+                texture.needsUpdate = true;
+                if (imageMesh) {
+                    imageMesh.material.map = texture;
+                    imageMesh.material.opacity = 1;
+                    imageMesh.material.alphaTest = 0.01;
+                    imageMesh.material.needsUpdate = true;
+                }
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
