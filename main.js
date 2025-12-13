@@ -8,6 +8,7 @@ renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+
 document.body.style.margin = '0';
 document.body.appendChild(renderer.domElement);
 
@@ -118,6 +119,42 @@ let model = null;
 let bagMaterial = null;
 let textMesh = null;
 let imageMesh = null;
+const defaultImagePath = '/assets/chipspreview.png';
+
+function createContainedTextureFromImage(img) {
+    const canvasW = 2048;
+    const canvasH = 2048;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    ctx.save();
+    ctx.translate(0, canvasH);
+    ctx.scale(1, -1);
+
+    const scale = Math.min(canvasW / img.naturalWidth, canvasH / img.naturalHeight);
+    const drawW = img.naturalWidth * scale;
+    const drawH = img.naturalHeight * scale;
+    const dx = (canvasW - drawW) / 2;
+    const dy = (canvasH - drawH) / 2;
+    ctx.drawImage(img, dx, dy, drawW, drawH);
+    ctx.restore();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+}
+
+function applyImageTexture(texture) {
+    if (!imageMesh) return;
+    imageMesh.material.map = texture;
+    imageMesh.material.opacity = 1;
+    imageMesh.material.alphaTest = 0.0;
+    imageMesh.material.needsUpdate = true;
+}
 new GLTFLoader().load('/assets/chips.glb', (g) => {
     model = g.scene;
 
@@ -130,7 +167,7 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
     model.scale.setScalar((1 / maxDim) * 1.5);
 
     model.position.set(0, 0.5, 0.5);
-    model.rotation.x = Math.PI / 9;
+    model.rotation.x = Math.PI / 12;
     model.rotation.y = yawBase;
 
     let bagAssigned = false;
@@ -153,11 +190,11 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
             }
             if (meshIndex === 3) {
                 imageMesh = n;
-                imageMesh.material = new THREE.MeshStandardMaterial({
+                // Use unlit material so uploaded image keeps its original brightness
+                imageMesh.material = new THREE.MeshBasicMaterial({
                     transparent: true,
                     opacity: 0,
-                    metalness: 0.1,
-                    roughness: 0.3,
+                    toneMapped: false,
                 });
             }
             meshIndex++;
@@ -169,6 +206,15 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
     scene.add(model);
     // Render default text immediately so it's visible before typing
     updateFlavorText('Classic');
+
+    // Load default image into layer 4 using same contain logic
+    const defaultImg = new Image();
+    defaultImg.onload = () => {
+        const tex = createContainedTextureFromImage(defaultImg);
+        applyImageTexture(tex);
+    };
+    defaultImg.onerror = (err) => console.error('Error loading default image:', err);
+    defaultImg.src = defaultImagePath;
 }, undefined, (err) => console.error('Error loading GLB:', err));
 
 if (bagColorSwatches.length) {
@@ -184,6 +230,16 @@ if (bagColorSwatches.length) {
 
 const flavorNameInput = document.getElementById('flavorName');
 const bagFontSelect = document.getElementById('bagFont');
+const textColorSwatches = Array.from(document.querySelectorAll('.text-color-swatch'));
+
+const getTextColor = () => {
+    const selected = textColorSwatches.find(b => b.classList.contains('selected'));
+    return selected ? selected.dataset.color : 'black';
+};
+
+const markSelectedTextSwatch = (btn) => {
+    textColorSwatches.forEach(b => b.classList.toggle('selected', b === btn));
+};
 
 const FONT_STACKS = {
     // standard: Helvetica-first stack with sensible fallbacks
@@ -210,7 +266,8 @@ function updateFlavorText(text) {
 
     ctx.save();
     ctx.scale(1, -1.5); // flip vertical only
-    ctx.fillStyle = '#000000';
+    const fill = getTextColor() === 'white' ? '#ffffff' : '#000000';
+    ctx.fillStyle = fill;
     const selectedAlias = bagFontSelect ? bagFontSelect.value : 'standard';
     ctx.font = resolveFontStack(selectedAlias);
     ctx.textAlign = 'center';
@@ -245,6 +302,17 @@ if (bagFontSelect) {
         if (flavorNameInput) {
             updateFlavorText(flavorNameInput.value);
         }
+    });
+}
+
+if (textColorSwatches.length) {
+    textColorSwatches.forEach(btn => {
+        btn.addEventListener('click', () => {
+            markSelectedTextSwatch(btn);
+            if (flavorNameInput) {
+                updateFlavorText(flavorNameInput.value);
+            }
+        });
     });
 }
 
@@ -290,38 +358,8 @@ if (bagImageInputEl) {
         reader.onload = () => {
             const img = new Image();
             img.onload = () => {
-                // Use the same target aspect as text layer for consistency
-                const canvasW = 2048;
-                const canvasH = 1024;
-                const canvas = document.createElement('canvas');
-                canvas.width = canvasW;
-                canvas.height = canvasH;
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvasW, canvasH);
-
-                // Flip vertically to match model UV orientation
-                ctx.save();
-                ctx.translate(0, canvasH);
-                ctx.scale(1, -1);
-
-                // Cover algorithm: no squish, fill at least one side fully
-                const scale = Math.max(canvasW / img.naturalWidth, canvasH / img.naturalHeight);
-                const drawW = img.naturalWidth * scale;
-                const drawH = img.naturalHeight * scale;
-                const dx = (canvasW - drawW) / 2;
-                const dy = (canvasH - drawH) / 2;
-                ctx.drawImage(img, dx, dy, drawW, drawH);
-                ctx.restore();
-
-                const texture = new THREE.CanvasTexture(canvas);
-                texture.encoding = THREE.sRGBEncoding;
-                texture.needsUpdate = true;
-                if (imageMesh) {
-                    imageMesh.material.map = texture;
-                    imageMesh.material.opacity = 1;
-                    imageMesh.material.alphaTest = 0.01;
-                    imageMesh.material.needsUpdate = true;
-                }
+                const texture = createContainedTextureFromImage(img);
+                applyImageTexture(texture);
             };
             img.src = reader.result;
         };
