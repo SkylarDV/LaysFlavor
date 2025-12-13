@@ -58,10 +58,6 @@
         font-size: 14px;
       }
 
-      .pos-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-top:8px; }
-      .pos-btn { height:44px; border-radius:8px; border:1px solid rgba(0,0,0,0.08); background:#dddddd80; font-size:18px; cursor:pointer; }
-      .pos-btn.selected { background:#ffd85a; border-color: rgba(0,0,0,0.08); }
-
       #menu .section strong {
         display:block;
         margin-bottom:8px;
@@ -120,34 +116,14 @@
         <label for="flavorDesc">Flavor Description</label>
         <textarea id="flavorDesc" placeholder="Short description of the flavor"></textarea>
 
-        <div class="colorInputs" style="display:flex; gap:12px; justify-content: space-around; align-items:center; margin-top:8px;">
-            <label for="bagColor">Bag Color</label>
-            <input id="bagColor" type="color" value="#ffcc00">
-            <label for="bgColor">Background Color</label>
-            <input id="bgColor" type="color" value="#dddddd">
+        <div class="colorInputs" style="display:flex; gap:12px; align-items:center; margin-top:8px;">
+          <label for="bagColor">Bag Color</label>
+          <input id="bagColor" type="color" value="#ffcc00">
         </div>
-        
-        <label for="dirIntensity">Light Intensity</label>
-        <input id="dirIntensity" type="range" min="0" max="2" step="0.01" value="0.8">
 
 
         <label for="bagImage">Bag Image</label>
         <input id="bagImage" type="file" accept="image/*">
-
-        <strong style="margin-top:12px; display:block;">Bag Position</strong>
-        <div id="bagPosGrid" class="pos-grid" role="group" aria-label="Bag positions">
-          <button class="pos-btn" data-key="TL" title="Top Left"></button>
-          <button class="pos-btn" data-key="TM" title="Top Center"></button>
-          <button class="pos-btn" data-key="TR" title="Top Right"></button>
-
-          <button class="pos-btn" data-key="ML" title="Middle Left"></button>
-          <button class="pos-btn" data-key="MM" title="Middle"></button>
-          <button class="pos-btn" data-key="MR" title="Middle Right"></button>
-
-          <button class="pos-btn" data-key="BL" title="Bottom Left"></button>
-          <button class="pos-btn" data-key="BM" title="Bottom Center"></button>
-          <button class="pos-btn" data-key="BR" title="Bottom Right"></button>
-        </div>
 
         <label for="bagFont">Font</label>
         <select id="bagFont">

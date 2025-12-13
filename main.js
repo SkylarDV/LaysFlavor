@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { GUI } from 'dat.gui';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -43,12 +42,14 @@ const scene = new THREE.Scene();
 
 const params = {
     envPath: '/assets/env.png',
-    backgroundColor: '#dddddd',
-    dirIntensity: 0.8,
-    position: { x: -1, y: 0.15, z: 0 },
 };
 
-scene.background = new THREE.Color(params.backgroundColor);
+const defaultBackground = '#dddddd';
+scene.background = new THREE.Color(defaultBackground);
+
+const yawBase = Math.PI / 6;        
+const yawHalfRange = Math.PI / 3;  
+const clampYaw = (y) => Math.min(yawBase + yawHalfRange, Math.max(yawBase - yawHalfRange, y));
 
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 pmremGenerator.compileEquirectangularShader();
@@ -95,67 +96,6 @@ dir.shadow.camera.bottom = -5;
 dir.shadow.bias = -0.0005;
 scene.add(dir);
 
-const gui = new GUI();
-gui.addColor(params, 'backgroundColor').name('Background Color').onChange((v) => {
-    scene.background = new THREE.Color(v);
-});
-gui.add(params, 'dirIntensity', 0, 2).name('Dir Intensity').onChange((v) => { dir.intensity = v; });
-
-const bgInput = document.getElementById('bgColor');
-if (bgInput) {
-    bgInput.value = params.backgroundColor;
-    bgInput.addEventListener('input', (e) => {
-        params.backgroundColor = e.target.value;
-        scene.background = new THREE.Color(params.backgroundColor);
-    });
-}
-
-const dirInput = document.getElementById('dirIntensity');
-if (dirInput) {
-    dirInput.value = params.dirIntensity;
-    dirInput.addEventListener('input', (e) => {
-        const v = parseFloat(e.target.value);
-        dir.intensity = v;
-        params.dirIntensity = v;
-        try { gui.__controllers.forEach(c => { if (c.property === 'dirIntensity') c.updateDisplay(); }); } catch {}
-    });
-}
-
-const gridPositions = {
-    TL: { x: -0.9, y: 0.20, z: 0 },
-    TM: { x: 0,    y: 0.20, z: 0 },
-    TR: { x: 0.9,  y: 0.20, z: 0 },
-
-    ML: { x: -0.9, y: 0, z: 0 },
-    MM: { x: 0,    y: 0, z: 0 },
-    MR: { x: 0.9,  y: 0, z: 0 },
-
-    BL: { x: -0.9, y: -0.24, z: 0 },
-    BM: { x: 0,    y: -0.24, z: 0 },
-    BR: { x: 0.9,  y: -0.24, z: 0 },
-};
-
-function applyGridPosition(key) {
-    const p = gridPositions[key];
-    if (!p) return;
-    params.position.x = p.x; params.position.y = p.y; params.position.z = p.z;
-    if (model) model.position.set(p.x, p.y, p.z);
-    try {
-        const buttons = document.querySelectorAll('#bagPosGrid .pos-btn');
-        buttons.forEach(b => b.classList.toggle('selected', b.dataset.key === key));
-    } catch {}
-}
-
-const gridEl = document.getElementById('bagPosGrid');
-if (gridEl) {
-    gridEl.addEventListener('click', (e) => {
-        const btn = e.target.closest('.pos-btn');
-        if (!btn) return;
-        const key = btn.dataset.key;
-        applyGridPosition(key);
-    });
-}
-
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(50, 50),
   new THREE.ShadowMaterial({ opacity: 0.2 }) 
@@ -177,11 +117,9 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
     model.scale.setScalar((1 / maxDim) * 1.5);
 
-    model.position.x = -1;
-    model.rotation.y = Math.PI / 6;
-    model.position.y += 0.15;
-
-    applyGridPosition('MM');
+    model.position.set(0, 0.5, 0.5);
+    model.rotation.x = Math.PI / 9;
+    model.rotation.y = yawBase;
 
     model.traverse((n) => {
         if (n.isMesh) {
@@ -205,8 +143,8 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
 renderer.domElement.addEventListener('pointermove', (e) => {
     if (!dragging || !model) return;
     const dx = e.clientX - px;
-    const rotateSpeed = 0.005; // fixed rotation speed (not exposed)
-    model.rotation.y += dx * rotateSpeed;
+    const rotateSpeed = 0.005;
+    model.rotation.y = clampYaw(model.rotation.y + dx * rotateSpeed);
     px = e.clientX; py = e.clientY;
 });
 
@@ -217,7 +155,6 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 renderer.domElement.addEventListener('pointercancel', () => dragging = false);
 
 window.addEventListener('resize', () => {
-    // recompute visible renderer area and update camera/projection
     updateRendererViewport();
 });
 
