@@ -62,6 +62,11 @@ const yawBase = Math.PI / 6;
 const yawHalfRange = Math.PI / 3;  
 const clampYaw = (y) => Math.min(yawBase + yawHalfRange, Math.max(yawBase - yawHalfRange, y));
 
+const DEFAULT_BAG_COLOR = '#b6352a';
+const DEFAULT_FLAVOR_NAME = 'Classic';
+const DEFAULT_TEXT_COLOR = 'white';
+const DEFAULT_FONT = 'standard';
+
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 pmremGenerator.compileEquirectangularShader();
 
@@ -243,6 +248,79 @@ if (bagColorSwatches.length) {
             }
         });
     });
+}
+
+function resetConfigurator() {
+    // Reset bag color to default
+    const defaultColorSwatch = bagColorSwatches.find(b => b.dataset.color === DEFAULT_BAG_COLOR);
+    if (defaultColorSwatch) {
+        markSelectedSwatch(defaultColorSwatch);
+        if (bagMaterial) {
+            bagMaterial.color.set(DEFAULT_BAG_COLOR);
+        }
+    }
+
+    // Reset flavor name
+    if (flavorNameInput) {
+        flavorNameInput.value = DEFAULT_FLAVOR_NAME;
+        updateFlavorText(DEFAULT_FLAVOR_NAME);
+    }
+
+    // Reset text color
+    const defaultTextSwatch = textColorSwatches.find(b => b.dataset.color === DEFAULT_TEXT_COLOR);
+    if (defaultTextSwatch) {
+        markSelectedTextSwatch(defaultTextSwatch);
+        if (flavorNameInput) {
+            updateFlavorText(flavorNameInput.value);
+        }
+    }
+
+    // Reset font
+    if (bagFontSelect) {
+        bagFontSelect.value = DEFAULT_FONT;
+        if (flavorNameInput) {
+            updateFlavorText(flavorNameInput.value);
+        }
+    }
+
+    // Reset flavor description
+    const flavorDescEl = document.getElementById('flavorDesc');
+    if (flavorDescEl) {
+        flavorDescEl.value = '';
+    }
+
+    // Reset image upload
+    if (bagImageInputEl) {
+        bagImageInputEl.value = '';
+        // Reset to default image
+        const defaultImg = new Image();
+        defaultImg.onload = () => {
+            const tex = createContainedTextureFromImage(defaultImg);
+            applyImageTexture(tex);
+        };
+        defaultImg.src = defaultImagePath;
+    }
+
+    // Reset model rotation and position
+    if (model) {
+        model.rotation.y = yawBase;
+        model.position.set(-0.25, 0.5, -0.75);
+    }
+
+    // Go back to section 1
+    const currentSection = document.querySelector('.menu-section.active');
+    if (currentSection) {
+        currentSection.classList.remove('active');
+    }
+    document.getElementById('section1').classList.add('active');
+    const dragHint = document.getElementById('dragHint');
+    if (dragHint) dragHint.style.display = 'block';
+}
+
+// Add reset button event listener
+const resetBtn = document.getElementById('resetBtn');
+if (resetBtn) {
+    resetBtn.addEventListener('click', resetConfigurator);
 }
 
 const flavorNameInput = document.getElementById('flavorName');
