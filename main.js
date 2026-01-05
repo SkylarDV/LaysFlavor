@@ -72,6 +72,15 @@ pmremGenerator.compileEquirectangularShader();
 
 let currentEnvMap = null; 
 let skyMesh = null;
+let envLoaded = false;
+let modelLoaded = false;
+
+function checkLoadingComplete() {
+    if (envLoaded && modelLoaded) {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+}
 
 function loadEnvironment(path) {
     const loader = new RGBELoader();
@@ -103,6 +112,9 @@ function loadEnvironment(path) {
         scene.add(skyMesh);
         // Remove default flat color background so skydome is visible
         scene.background = null;
+        
+        envLoaded = true;
+        checkLoadingComplete();
     }, undefined, (err) => console.error('Error loading env texture:', err));
 }
 
@@ -142,6 +154,8 @@ let bagMaterial = null;
 let textMesh = null;
 let imageMesh = null;
 const defaultImagePath = '/assets/chipspreview.png';
+const BAG_SUBMIT_API = 'https://laysflavorapi.onrender.com/api/bag';
+let bagImageData = defaultImagePath;
 
 function createContainedTextureFromImage(img) {
     const canvasW = 2048;
@@ -176,6 +190,18 @@ function applyImageTexture(texture) {
     imageMesh.material.opacity = 1;
     imageMesh.material.alphaTest = 0.0;
     imageMesh.material.needsUpdate = true;
+}
+
+function buildUploadDataUrl(img, maxDim = 800, quality = 0.7) {
+    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', quality);
 }
 new GLTFLoader().load('/assets/chips.glb', (g) => {
     model = g.scene;
@@ -234,8 +260,16 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
     defaultImg.onload = () => {
         const tex = createContainedTextureFromImage(defaultImg);
         applyImageTexture(tex);
+        bagImageData = defaultImagePath;
+        
+        modelLoaded = true;
+        checkLoadingComplete();
     };
-    defaultImg.onerror = (err) => console.error('Error loading default image:', err);
+    defaultImg.onerror = (err) => {
+        console.error('Error loading default image:', err);
+        modelLoaded = true;
+        checkLoadingComplete();
+    };
     defaultImg.src = defaultImagePath;
 }, undefined, (err) => console.error('Error loading GLB:', err));
 
@@ -297,6 +331,7 @@ function resetConfigurator() {
         defaultImg.onload = () => {
             const tex = createContainedTextureFromImage(defaultImg);
             applyImageTexture(tex);
+            bagImageData = defaultImagePath;
         };
         defaultImg.src = defaultImagePath;
     }
@@ -326,6 +361,142 @@ if (resetBtn) {
 const flavorNameInput = document.getElementById('flavorName');
 const bagFontSelect = document.getElementById('bagFont');
 const textColorSwatches = Array.from(document.querySelectorAll('.text-color-swatch'));
+const loginForm = document.getElementById('loginForm');
+const loginNameInput = document.getElementById('loginName');
+const loginPasswordInput = document.getElementById('loginPassword');
+const loginStatus = document.getElementById('loginStatus');
+const logoutBtn = document.getElementById('logoutBtn');
+const submitBtnEl = document.getElementById('submitBtn');
+const flavorDescEl = document.getElementById('flavorDesc');
+const submitModal = document.getElementById('submitModal');
+const confirmSubmitBtn = document.getElementById('confirmSubmit');
+const cancelSubmitBtn = document.getElementById('cancelSubmit');
+let currentUser = null;
+const LOGIN_API = 'https://laysflavorapi.onrender.com/api/user/login';
+
+function getStoredUser() {
+    try {
+        const raw = localStorage.getItem('laysUser');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.name) return parsed;
+    } catch (err) {
+        console.warn('Unable to read stored user', err);
+    }
+    return null;
+}
+
+function persistUser(user) {
+    try {
+        localStorage.setItem('laysUser', JSON.stringify({ name: user.name, token: user.token || null, id: user.id || null }));
+    } catch (err) {
+        console.warn('Unable to persist user', err);
+    }
+}
+
+function clearStoredUser() {
+    try {
+        localStorage.removeItem('laysUser');
+    } catch (err) {
+        console.warn('Unable to clear stored user', err);
+    }
+}
+
+function updateSubmitCta() {
+    if (!submitBtnEl) return;
+    if (currentUser) {
+        submitBtnEl.textContent = `Post this bag as ${currentUser.name}`;
+        submitBtnEl.disabled = false;
+    } else {
+        submitBtnEl.textContent = 'Log in to post';
+        submitBtnEl.disabled = true;
+    }
+}
+
+function updateLoginUi() {
+    const loggedIn = !!currentUser;
+    if (loginForm) loginForm.style.display = loggedIn ? 'none' : 'flex';
+    if (loginStatus) {
+        loginStatus.textContent = loggedIn ? `Logged in as ${currentUser.name}` : 'Log in to post your flavor.';
+        loginStatus.style.color = '#444';
+    }
+    if (logoutBtn) logoutBtn.style.display = loggedIn ? 'inline-flex' : 'none';
+    updateSubmitCta();
+}
+
+function setLoginMessage(msg, isError = false) {
+    if (!loginStatus) return;
+    loginStatus.textContent = msg;
+    loginStatus.style.color = isError ? '#b00020' : '#444';
+}
+
+function setLoginBusy(isBusy) {
+    if (!loginForm) return;
+    Array.from(loginForm.elements).forEach((el) => {
+        if (el.tagName === 'BUTTON' || el.tagName === 'INPUT') {
+            el.disabled = isBusy;
+        }
+    });
+}
+
+async function loginUserViaApi(username, password) {
+    const res = await fetch(LOGIN_API, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username, password })
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+        const message = (data && (data.message || data.error)) || 'Login failed';
+        throw new Error(message);
+    }
+    const token = data && (data.token || data.jwt || data.accessToken || data.access_token || null);
+    const userName = (data && (data.username || data.name || data.user?.username || data.user?.name)) || username;
+    const userId = (data && (data.user?._id || data.user?.id || data._id || data.id)) || null;
+    return { name: userName, token, id: userId, raw: data };
+}
+
+const storedUser = getStoredUser();
+if (storedUser) currentUser = storedUser;
+updateLoginUi();
+
+if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = loginNameInput ? loginNameInput.value.trim() : '';
+        const password = loginPasswordInput ? loginPasswordInput.value.trim() : '';
+        if (!name || !password) {
+            setLoginMessage('Username and password are required.', true);
+            return;
+        }
+        setLoginBusy(true);
+        setLoginMessage('Signing in…');
+        try {
+            const result = await loginUserViaApi(name, password);
+            currentUser = { name: result.name, token: result.token || null, id: result.id || null };
+            persistUser(currentUser);
+            if (loginPasswordInput) loginPasswordInput.value = '';
+            updateLoginUi();
+            setLoginMessage(`Logged in as ${currentUser.name}`);
+        } catch (err) {
+            setLoginMessage(err.message || 'Login failed', true);
+        } finally {
+            setLoginBusy(false);
+        }
+    });
+}
+
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+        currentUser = null;
+        clearStoredUser();
+        if (loginNameInput) loginNameInput.value = '';
+        if (loginPasswordInput) loginPasswordInput.value = '';
+        updateLoginUi();
+    });
+}
 
 const getTextColor = () => {
     const selected = textColorSwatches.find(b => b.classList.contains('selected'));
@@ -518,9 +689,73 @@ if (bagImageInputEl) {
             img.onload = () => {
                 const texture = createContainedTextureFromImage(img);
                 applyImageTexture(texture);
+                bagImageData = buildUploadDataUrl(img, 900, 0.7);
             };
             img.src = reader.result;
         };
         reader.readAsDataURL(file);
     });
+}
+
+// Submit handling
+if (cancelSubmitBtn && submitModal) {
+    cancelSubmitBtn.addEventListener('click', () => {
+        submitModal.classList.remove('active');
+    });
+}
+
+window.addEventListener('bag-submit-clicked', () => submitBag());
+
+function setSubmitBusy(isBusy) {
+    if (submitBtnEl) submitBtnEl.disabled = isBusy || !currentUser;
+    if (confirmSubmitBtn) confirmSubmitBtn.disabled = isBusy;
+}
+
+function buildBagPayload() {
+    const flavorName = flavorNameInput ? flavorNameInput.value.trim() : DEFAULT_FLAVOR_NAME;
+    const desc = flavorDescEl ? flavorDescEl.value.trim() : '';
+    const payload = {
+        name: flavorName || DEFAULT_FLAVOR_NAME,
+        flavor: desc || flavorName || DEFAULT_FLAVOR_NAME,
+        colour: getBagColor(),
+        textColour: getTextColor(),
+        font: bagFontSelect ? bagFontSelect.value : DEFAULT_FONT,
+        bagImage: bagImageData || defaultImagePath,
+    };
+    if (currentUser && currentUser.id) {
+        payload.creator = currentUser.id;
+    }
+    return payload;
+}
+
+async function submitBag() {
+    if (!currentUser) {
+        setLoginMessage('Please log in before posting.', true);
+        if (submitModal) submitModal.classList.add('active');
+        return;
+    }
+    setSubmitBusy(true);
+    try {
+        const payload = buildBagPayload();
+        const headers = { 'Content-Type': 'application/json' };
+        if (currentUser.token) headers.Authorization = `Bearer ${currentUser.token}`;
+
+        const res = await fetch(BAG_SUBMIT_API, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            const message = (data && (data.message || data.error)) || 'Submit failed';
+            throw new Error(message);
+        }
+        if (submitModal) submitModal.classList.remove('active');
+        window.dispatchEvent(new CustomEvent('bag-spinout'));
+    } catch (err) {
+        setLoginMessage(err.message || 'Submit failed', true);
+        if (submitModal) submitModal.classList.add('active');
+    } finally {
+        setSubmitBusy(false);
+    }
 }

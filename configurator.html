@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Lays - Do Us A Flavor</title>
+    <style>
+      html,body { height: 100%; margin: 0; font-family: "Helvetica Neue", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica", Arial; color: #222; }
+
+      #menu {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 40vw;       
+        min-width: 320px;
+        height: 100vh;
+        z-index: 60;          
+        padding: 28px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        align-items: stretch;
+
+        background: linear-gradient(180deg, #ffc800 0%, #ffd85a 100%);
+        box-shadow: -18px 0 40px rgba(0,0,0,0.18);
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+        border-left: 1px solid rgba(255,255,255,0.12);
+        overflow: auto;
+      }
+
+      #menu::before{
+        content: "";
+        display: block;
+        width: 44px;
+        height: 6px;
+        border-radius: 6px;
+        margin: 6px auto 12px auto;
+        background: rgba(255,255,255,0.25);
+      }
+
+      #menu h1 {
+        margin: -25px 0 6px 0;
+        font-size: 30px;
+        line-height: 1;
+        font-weight: 800;
+        color: #ffffff;
+        letter-spacing: -0.5px;
+        text-shadow: 0 2px 0 rgba(0,0,0,0.06);
+      }
+
+      #menu .section {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 8px 24px rgba(11,11,11,0.06);
+        color: #222;
+        font-size: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      #menu .section strong {
+        display:block;
+        color:#111;
+        font-weight:700;
+        font-size:13px;
+      }
+
+      #menu label { display:block; font-size:13px; color:#333; margin-bottom:6px; }
+      #menu input[type="text"], #menu input[type="email"], #menu input[type="password"], #menu textarea, #menu select {
+        width:100%;
+        box-sizing:border-box;
+        padding:10px 12px;
+        border-radius:10px;
+        border:1px solid rgba(0,0,0,0.08);
+        background:#fff;
+        font-size:14px;
+      }
+      #menu textarea { min-height:80px; resize:vertical; }
+      #menu input[type="color"]{
+        width:64px;
+        height:36px;
+        padding:0;
+        border:none;
+        background:transparent;
+        margin-top:6px;
+      }
+      .color-swatches { display:grid; grid-template-columns: repeat(10, 1fr); gap:8px; width:100%; }
+      .color-swatch { height:28px; border-radius:6px; border:1px solid rgba(0,0,0,0.12); cursor:pointer; transition: transform 0.05s ease, box-shadow 0.1s ease; }
+      .color-swatch.selected { outline:2px solid #222; outline-offset:2px; box-shadow:0 0 0 2px rgba(0,0,0,0.08); transform: translateY(-1px); }
+      .text-color-swatches { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px; width:100%; max-width:200px; }
+      .text-color-swatch { height:32px; border-radius:8px; border:1px solid rgba(0,0,0,0.16); cursor:pointer; transition: transform 0.05s ease, box-shadow 0.1s ease; }
+      .text-color-swatch.selected { outline:2px solid #222; outline-offset:2px; box-shadow:0 0 0 2px rgba(0,0,0,0.08); transform: translateY(-1px); }
+      #menu input[type="file"] {
+        margin-top:8px;
+        font-size:13px;
+      }
+
+      #menu .section + .section { margin-top: 6px; }
+
+      #menu::-webkit-scrollbar { width:10px; }
+      #menu::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius:8px; }
+
+      .menu-section { display:none; }
+      .menu-section.active { display:flex; flex-direction:column; gap:18px; }
+      #nextBtn { padding:10px 20px; background:#ffffff; border:none; border-radius:8px; cursor:pointer; font-weight:600; align-self:flex-end; }
+      #nextBtn:hover { background:#f0f0f0; }
+
+      #submitBtn { padding:10px 20px; background:#ffffff; border:none; border-radius:8px; cursor:pointer; font-weight:600; align-self:flex-end; }
+      #submitBtn:hover { background:#f0f0f0; }
+
+      #logoutBtn {
+        padding:8px 14px;
+        background:#ffffff;
+        border:1px solid rgba(0,0,0,0.1);
+        border-radius:8px;
+        cursor:pointer;
+        font-weight:600;
+        align-self:flex-start;
+        display:none;
+      }
+      #logoutBtn:hover { background:#f0f0f0; }
+
+      #loginForm { display:flex; flex-direction:column; gap:12px; }
+      #loginStatus { font-size:13px; color:#444; }
+      
+      #resetBtn { 
+        position: fixed;
+        top: 20px;
+        right: 42%;
+        z-index: 70;
+        padding: 10px 20px;
+        background: #e74c3c;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transition: all 0.2s ease;
+      }
+      #resetBtn:hover { 
+        background: #ffe6e6;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+      }
+      
+      .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center; }
+      .modal.active { display:flex; }
+      .modal-content { background:#fff; padding:40px; border-radius:12px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.3); }
+      .modal-content h2 { margin:0 0 20px 0; font-size:18px; }
+      .modal-buttons { display:flex; gap:12px; justify-content:center; margin-top:24px; }
+      .modal-btn { padding:10px 24px; border:none; border-radius:8px; cursor:pointer; font-weight:600; }
+      .modal-btn.confirm { background:#ffc800; color:#333; }
+      .modal-btn.confirm:hover { background:#ffb700; }
+      .modal-btn.cancel { background:#ddd; color:#333; }
+      .modal-btn.cancel:hover { background:#ccc; }
+
+      #bagImage { display:none; }
+      .drop-zone { border:2px dashed rgba(0,0,0,0.2); border-radius:8px; padding:30px; text-align:center; cursor:pointer; transition: all 0.2s ease; background:#f9f9f9; }\n      .drop-zone:hover, .drop-zone.dragover { border-color:#ffc800; background:#fff9e6; }
+      .drop-zone-text { font-size:13px; color:#666; }
+
+      canvas { display:block; }
+      #dragHint { 
+        position: fixed; 
+        bottom: 100px; 
+        left: 50%; 
+        transform: translateX(-50%); 
+        background: rgba(0, 0, 0, 0.6); 
+        color: #ffffff; 
+        padding: 12px 24px; 
+        border-radius: 8px; 
+        font-size: 14px; 
+        padding-right: 100px;
+        z-index: 30; 
+        pointer-events: none; }
+
+      /* Loading overlay */
+      #loadingOverlay {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(180deg, #ffc800 0%, #ffd85a 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+      }
+      .loading-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 24px 28px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-weight: 700;
+        color: #333;
+      }
+      .loading-spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid rgba(0,0,0,0.12);
+        border-top-color: #ffc800;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div id="loadingOverlay" aria-label="Loading">
+      <div class="loading-card">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <div>Loading your flavor laboratory…</div>
+      </div>
+    </div>
+    <div id="dragHint">Drag horizontally to look around</div>
+    <button id="resetBtn">Reset All</button>
+    <div id="menu" aria-label="Controls">
+      <h1>Your Lays Flavor</h1>
+
+      <div class="menu-section active" id="section1">
+        <div class="section">
+          <strong>Color & Image</strong>
+          <label style="align-self:flex-start;">Bag Color</label>
+          <div id="bagColorSwatches" class="color-swatches" role="group" aria-label="Bag colors">
+            <button class="color-swatch selected" data-color="#b6352a" style="background:#b6352a;"></button>
+            <button class="color-swatch" data-color="#d46b2d" style="background:#d46b2d;"></button>
+            <button class="color-swatch" data-color="#9b6b2f" style="background:#9b6b2f;"></button>
+            <button class="color-swatch" data-color="#2f7f46" style="background:#2f7f46;"></button>
+            <button class="color-swatch" data-color="#2f8f8f" style="background:#2f8f8f;"></button>
+            <button class="color-swatch" data-color="#2f5fa3" style="background:#2f5fa3;"></button>
+            <button class="color-swatch" data-color="#7a4fb3" style="background:#7a4fb3;"></button>
+            <button class="color-swatch" data-color="#c45c8f" style="background:#c45c8f;"></button>
+            <button class="color-swatch" data-color="#3a3a3a" style="background:#3a3a3a;"></button>
+            <button class="color-swatch" data-color="#d9d9d9" style="background:#d9d9d9;"></button>
+            <button class="color-swatch" data-color="#e06a62" style="background:#e06a62;"></button>
+            <button class="color-swatch" data-color="#e29b3d" style="background:#e29b3d;"></button>
+            <button class="color-swatch" data-color="#f3d25b" style="background:#f3d25b;"></button>
+            <button class="color-swatch" data-color="#7fcb92" style="background:#7fcb92;"></button>
+            <button class="color-swatch" data-color="#6bbcc4" style="background:#6bbcc4;"></button>
+            <button class="color-swatch" data-color="#6f8ec6" style="background:#6f8ec6;"></button>
+            <button class="color-swatch" data-color="#a48bd6" style="background:#a48bd6;"></button>
+            <button class="color-swatch" data-color="#e7a1c3" style="background:#e7a1c3;"></button>
+            <button class="color-swatch" data-color="#8b8b8b" style="background:#8b8b8b;"></button>
+            <button class="color-swatch" data-color="#ffffff" style="background:#ffffff;"></button>
+          </div>
+          <label for="bagImage">Bag Image</label>
+          <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-text">Drag and drop image here or click to select</div>
+          </div>
+          <input id="bagImage" type="file" accept="image/*">
+        </div>
+        <button id="nextBtn">Next</button>
+      </div>
+
+      <div class="menu-section" id="section2">
+        <div class="section">
+          <strong>Name, Font & Description</strong>
+          <label for="flavorName">Flavor Name</label>
+          <input id="flavorName" type="text" value="Classic" placeholder="e.g. Classic">
+          <label for="textColor">Text Color</label>
+          <div id="textColorSwatches" class="text-color-swatches" role="group" aria-label="Text color">
+            <button class="text-color-swatch" data-color="black" aria-label="Black" style="background:#000000;"></button>
+            <button class="text-color-swatch selected" data-color="white" aria-label="White" style="background:#ffffff;"></button>
+          </div>
+          <label for="bagFont">Font</label>
+          <select id="bagFont">
+            <option value="standard">Standard</option>
+            <option value="classic">Classic</option>
+            <option value="decorative">Decorative</option>
+          </select>
+          <label for="flavorDesc">Flavor Description</label>
+          <textarea id="flavorDesc" placeholder="Short description of the flavor"></textarea>
+        </div>
+        <button id="nextBtn">Next</button>
+      </div>
+
+      <div class="menu-section" id="section3">
+        <div class="section">
+          <strong>Creator Login</strong>
+          <div id="loginStatus">Log in to post your flavor.</div>
+          <form id="loginForm">
+            <div>
+              <label for="loginName">Username</label>
+              <input id="loginName" type="text" placeholder="e.g. chiplover99" autocomplete="username" required>
+            </div>
+            <div>
+              <label for="loginPassword">Password</label>
+              <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" required>
+            </div>
+            <button type="submit" class="modal-btn confirm">Log In</button>
+          </form>
+          <button id="logoutBtn" type="button">Log Out</button>
+        </div>
+        <button id="submitBtn">Log in to post</button>
+      </div>
+    </div>
+
+    <div id="submitModal" class="modal">
+      <div class="modal-content">
+        <h2>Are you sure you're finished?</h2>
+        <div class="modal-buttons">
+          <button class="modal-btn confirm" id="confirmSubmit">Yes, Submit</button>
+          <button class="modal-btn cancel" id="cancelSubmit">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+    <script>
+      let currentSection = 1;
+      const nextBtns = document.querySelectorAll('#nextBtn');
+      const dragHint = document.getElementById('dragHint');
+      nextBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (currentSection === 1) {
+            dragHint.style.display = 'none';
+          }
+          document.getElementById(`section${currentSection}`).classList.remove('active');
+          currentSection = currentSection < 3 ? currentSection + 1 : 1;
+          document.getElementById(`section${currentSection}`).classList.add('active');
+        });
+      });
+
+      const dropZone = document.getElementById('dropZone');
+      const bagImageInput = document.getElementById('bagImage');
+      const submitBtn = document.getElementById('submitBtn');
+      const submitModal = document.getElementById('submitModal');
+      const confirmSubmit = document.getElementById('confirmSubmit');
+      const cancelSubmit = document.getElementById('cancelSubmit');
+      
+      submitBtn.addEventListener('click', () => {
+        submitModal.classList.add('active');
+      });
+      
+      cancelSubmit.addEventListener('click', () => {
+        submitModal.classList.remove('active');
+      });
+      
+      confirmSubmit.addEventListener('click', () => {
+        submitModal.classList.remove('active');
+        window.dispatchEvent(new CustomEvent('bag-submit-clicked'));
+      });
+      
+      dropZone.addEventListener('click', () => bagImageInput.click());
+      
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+      });
+      
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+      });
+      
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+      });
+      
+      dropZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          bagImageInput.files = files;
+          bagImageInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }, false);
+    </script>
+  </body>
+</html>
