@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const API_URL = 'https://laysflavorapi.onrender.com/api/bag';
-const PAGE_SIZE = 3;
+const PAGE_SIZE = 8;
 const DEFAULT_IMAGE = '/assets/chipspreview.png';
 const MODEL_PATH = '/assets/chips.glb';
 

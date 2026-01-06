@@ -192,16 +192,21 @@ function applyImageTexture(texture) {
     imageMesh.material.needsUpdate = true;
 }
 
-function buildUploadDataUrl(img, maxDim = 800, quality = 0.7) {
+function buildUploadDataUrl(img, maxDim = 512, quality = 0.7) {
     const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
     const w = Math.max(1, Math.round(img.naturalWidth * scale));
     const h = Math.max(1, Math.round(img.naturalHeight * scale));
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext('2d');
+    // Explicitly enable alpha channel
+    const ctx = canvas.getContext('2d', { alpha: true });
+    // Set fillStyle to transparent and fill to ensure alpha channel is active
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    ctx.fillRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
-    return canvas.toDataURL('image/jpeg', quality);
+    // Use WebP for better compression with transparency support
+    return canvas.toDataURL('image/webp', quality);
 }
 new GLTFLoader().load('/assets/chips.glb', (g) => {
     model = g.scene;
@@ -672,6 +677,8 @@ renderer.render = (sc, cam) => {
             spinoutActive = false;
             model.visible = false;
             model.position.y = spinoutStartY;
+            // Redirect to homepage after animation completes
+            window.location.href = '/';
         }
     }
     _origRender(sc, cam);
