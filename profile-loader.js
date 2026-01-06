@@ -1,19 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-const API_URL = 'https://laysflavorapi.onrender.com/api/bag';
-const PAGE_SIZE = 8;
 const DEFAULT_IMAGE = '/assets/chipspreview.png';
 const MODEL_PATH = '/assets/chips.glb';
-
-const gridEl = document.getElementById('grid');
-const statusEl = document.getElementById('status');
-const spinnerEl = document.getElementById('spinner');
-const loadMoreBtn = document.getElementById('loadMore');
-
-let allBags = [];
-let cursor = 0;
-let loading = false;
 
 const FONT_STACKS = {
   standard: 'bold 300px "Helvetica Neue", Helvetica, Arial, "Segoe UI", system-ui, sans-serif',
@@ -87,7 +76,6 @@ const modelPromise = new Promise((resolve, reject) => {
     },
     (progress) => {},
     (err) => {
-      console.error('Model load failed:', err);
       reject(err);
     }
   );
@@ -99,23 +87,20 @@ function cloneModel(gltf) {
   gltf.scene.traverse((node) => {
     if (node.isSkinnedMesh) skinnedMeshes[node.name] = node;
   });
-  const cloneBones = {};
-  const cloneSkinnedMeshes = {};
   clone.traverse((node) => {
-    if (node.isBone) cloneBones[node.name] = node;
-    if (node.isSkinnedMesh) cloneSkinnedMeshes[node.name] = node;
+    if (node.isSkinnedMesh) {
+      const original = skinnedMeshes[node.name];
+      if (original) {
+        node.skeleton = original.skeleton;
+        node.bind(node.skeleton, new THREE.Matrix4());
+      }
+    }
   });
-  for (const name in skinnedMeshes) {
-    const skinnedMesh = skinnedMeshes[name];
-    const cloneSkinnedMesh = cloneSkinnedMeshes[name];
-    const skeleton = skinnedMesh.skeleton;
-    const clonedBones = skeleton.bones.map(bone => cloneBones[bone.name]);
-    cloneSkinnedMesh.bind(new THREE.Skeleton(clonedBones, skeleton.boneInverses), cloneSkinnedMesh.matrixWorld);
-  }
   return clone;
 }
 
-async function renderBagCard(bag) {
+// Override renderBagCard to use Three.js
+window.renderBagCard = async function (bag) {
   const card = document.createElement('div');
   card.className = 'card';
   
@@ -127,48 +112,50 @@ async function renderBagCard(bag) {
   canvas.style.display = 'block';
   canvas.style.background = '#f8f5ec';
   
-  // Create like button
-  const likeBtn = document.createElement('button');
-  likeBtn.className = 'like-btn';
-  likeBtn.innerHTML = '★';
-  likeBtn.setAttribute('aria-label', 'Like this bag');
-  likeBtn.addEventListener('click', async (e) => {
+  // Create edit button (pencil icon)
+  const editBtn = document.createElement('button');
+  editBtn.className = 'like-btn';
+  editBtn.innerHTML = '✏️';
+  editBtn.setAttribute('aria-label', 'Edit this bag');
+  editBtn.title = 'Edit';
+  editBtn.style.right = '48px';
+  editBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    
-    // Get current user
-    const storedUser = localStorage.getItem('laysUser');
-    if (!storedUser) {
-      alert('Please log in to vote');
+    // Navigate to configurator with bag ID
+    if (bag._id) {
+      window.location.href = `/configurator.html?id=${bag._id}`;
+    }
+  });
+  
+  // Create delete button (trash icon)
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'like-btn';
+  deleteBtn.innerHTML = '🗑️';
+  deleteBtn.setAttribute('aria-label', 'Delete this bag');
+  deleteBtn.title = 'Delete';
+  deleteBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this bag?')) {
       return;
     }
     
     try {
-      const user = JSON.parse(storedUser);
-      
-      if (!user.id) {
-        alert('User ID not found');
-        return;
-      }
-      if (!bag._id) {
-        alert('Bag ID not found');
-        return;
-      }
-      
-      const isLiked = likeBtn.classList.contains('liked');
-      
-      // Send vote request
-      const res = await fetch(`https://laysflavorapi.onrender.com/api/vote/${bag._id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id })
+      const res = await fetch(`https://laysflavorapi.onrender.com/api/bag/${bag._id}`, {
+        method: 'DELETE'
       });
       
-      if (!res.ok) throw new Error('Vote failed');
+      if (!res.ok) throw new Error('Delete failed');
       
-      // Toggle liked state
-      likeBtn.classList.toggle('liked');
+      // Remove card from grid
+      card.remove();
+      
+      // Check if grid is empty
+      const grid = document.getElementById('grid');
+      if (grid.children.length === 0) {
+        document.getElementById('emptyState').style.display = 'block';
+      }
     } catch (err) {
-      alert('Failed to register vote');
+      alert('Failed to delete bag');
     }
   });
   
@@ -181,8 +168,10 @@ async function renderBagCard(bag) {
   descEl.className = 'desc';
   descEl.textContent = bag.flavor || 'Custom Lays bag';
   meta.append(nameEl, descEl);
-  card.append(canvas, likeBtn, meta);
-  gridEl.appendChild(card);
+  
+  const grid = document.getElementById('grid');
+  card.append(canvas, editBtn, deleteBtn, meta);
+  grid.appendChild(card);
 
   try {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas });
@@ -269,59 +258,6 @@ async function renderBagCard(bag) {
         });
     }
   } catch (err) {
-    if (gridEl.contains(card)) gridEl.removeChild(card);
+    if (grid.contains(card)) grid.removeChild(card);
   }
-}
-
-async function fetchBags() {
-  statusEl.textContent = 'Loading bags…';
-  if (spinnerEl) spinnerEl.style.display = 'block';
-  try {
-    const res = await fetch(API_URL);
-    const data = await res.json();
-    const bags = Array.isArray(data)
-      ? data
-      : Array.isArray(data?.bags)
-        ? data.bags
-        : Array.isArray(data?.data?.bags)
-          ? data.data.bags
-          : [];
-    allBags = bags;
-    if (spinnerEl) spinnerEl.style.display = 'none';
-    if (!allBags.length) {
-      statusEl.textContent = 'No bags yet. Be the first!';
-      loadMoreBtn.disabled = true;
-      return;
-    }
-    statusEl.textContent = '';
-    loadMoreBtn.disabled = false;
-    loading = false;
-    renderNextPage();
-  } catch (err) {
-    if (spinnerEl) spinnerEl.style.display = 'none';
-    statusEl.textContent = 'Failed to load bags.';
-    loadMoreBtn.disabled = true;
-    loading = false;
-  }
-}
-
-function renderNextPage() {
-  const slice = allBags.slice(cursor, cursor + PAGE_SIZE);
-  slice.forEach(bag => {
-    renderBagCard(bag);
-  });
-  cursor += slice.length;
-  if (cursor >= allBags.length) {
-    loadMoreBtn.disabled = true;
-    loadMoreBtn.textContent = 'All bags loaded';
-  } else {
-    loadMoreBtn.disabled = false;
-    loadMoreBtn.textContent = 'Load more';
-  }
-}
-
-loadMoreBtn.addEventListener('click', () => {
-  renderNextPage();
-});
-
-fetchBags();
+};

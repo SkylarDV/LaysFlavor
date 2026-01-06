@@ -115,7 +115,7 @@ function loadEnvironment(path) {
         
         envLoaded = true;
         checkLoadingComplete();
-    }, undefined, (err) => console.error('Error loading env texture:', err));
+    }, undefined, (err) => {});
 }
 
 loadEnvironment(params.envPath);
@@ -276,7 +276,7 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
         checkLoadingComplete();
     };
     defaultImg.src = defaultImagePath;
-}, undefined, (err) => console.error('Error loading GLB:', err));
+}, undefined, (err) => {});
 
 if (bagColorSwatches.length) {
     bagColorSwatches.forEach(btn => {
@@ -457,9 +457,23 @@ async function loginUserViaApi(username, password) {
         const message = (data && (data.message || data.error)) || 'Login failed';
         throw new Error(message);
     }
-    const token = data && (data.token || data.jwt || data.accessToken || data.access_token || null);
+    const token = data && (data.data?.token || data.token || data.jwt || data.accessToken || data.access_token || null);
     const userName = (data && (data.username || data.name || data.user?.username || data.user?.name)) || username;
-    const userId = (data && (data.user?._id || data.user?.id || data._id || data.id)) || null;
+    let userId = (data && (data.user?._id || data.user?.id || data._id || data.id)) || null;
+    
+    // If no userId but have token, decode JWT to extract _id
+    if (!userId && token) {
+        try {
+            const parts = token.split('.');
+            if (parts.length === 3) {
+                const decoded = JSON.parse(atob(parts[1]));
+                userId = decoded?._id || decoded?.id || null;
+            }
+        } catch (err) {
+            // ignore JWT decode errors
+        }
+    }
+    
     return { name: userName, token, id: userId, raw: data };
 }
 
