@@ -128,6 +128,55 @@ async function renderBagCard(bag) {
   canvas.style.display = 'block';
   canvas.style.background = '#f8f5ec';
   
+  // Create like button
+  const likeBtn = document.createElement('button');
+  likeBtn.className = 'like-btn';
+  likeBtn.innerHTML = '★';
+  likeBtn.setAttribute('aria-label', 'Like this bag');
+  likeBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    
+    // Get current user
+    const storedUser = localStorage.getItem('laysUser');
+    if (!storedUser) {
+      alert('Please log in to vote');
+      return;
+    }
+    
+    try {
+      const user = JSON.parse(storedUser);
+      console.log('Stored user:', user);
+      console.log('User ID:', user.id, 'Bag ID:', bag._id, 'Full bag:', bag);
+      
+      if (!user.id) {
+        alert('User ID not found');
+        return;
+      }
+      if (!bag._id) {
+        alert('Bag ID not found');
+        return;
+      }
+      
+      const isLiked = likeBtn.classList.contains('liked');
+      
+      // Send vote request
+      const res = await fetch(`https://laysflavorapi.onrender.com/api/vote/${bag._id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+      
+      console.log('Vote response:', res.status, res);
+      if (!res.ok) throw new Error('Vote failed');
+      
+      // Toggle liked state
+      likeBtn.classList.toggle('liked');
+    } catch (err) {
+      console.error('Vote error:', err);
+      alert('Failed to register vote');
+    }
+  });
+  
   const meta = document.createElement('div');
   meta.className = 'meta';
   const nameEl = document.createElement('div');
@@ -137,7 +186,7 @@ async function renderBagCard(bag) {
   descEl.className = 'desc';
   descEl.textContent = bag.flavor || 'Custom Lays bag';
   meta.append(nameEl, descEl);
-  card.append(canvas, meta);
+  card.append(canvas, likeBtn, meta);
   gridEl.appendChild(card);
 
   try {

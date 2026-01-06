@@ -61,6 +61,10 @@
 		button#loadMore { padding:10px 16px; border:none; border-radius:10px; background:var(--accent); font-weight:700; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,0.12); }
 		button#loadMore:disabled { opacity:0.55; cursor:not-allowed; box-shadow:none; }
 		.status { text-align:center; margin:16px 0; color:var(--muted); font-size:13px; }
+		.card { position:relative; }
+		.like-btn { position:absolute; top:8px; right:8px; width:36px; height:36px; border:none; background:#fff; border-radius:6px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.12); transition:all 0.2s ease; color:#000; }
+		.like-btn:hover { background:#fff; color:#ffc800; transform:scale(1.05); }
+		.like-btn.liked { color:#ffc800; }
 	</style>
 </head>
 <body>
@@ -163,11 +167,22 @@
 			updateLoginUI();
 		});
 
+		function decodeJWT(token) {
+			try {
+				const parts = token.split('.');
+				if (parts.length !== 3) return null;
+				const decoded = JSON.parse(atob(parts[1]));
+				return decoded;
+			} catch (err) {
+				return null;
+			}
+		}
+
 		// Login form submission
 		document.getElementById('loginForm').addEventListener('submit', async (e) => {
 			e.preventDefault();
-			const username = document.getElementById('loginName').value;
-			const password = document.getElementById('loginPassword').value;
+			const username = document.getElementById('loginName').value.trim();
+			const password = document.getElementById('loginPassword').value.trim();
 			const loginMsg = document.getElementById('loginMessage');
 			
 			loginMsg.textContent = 'Signing in...';
@@ -180,39 +195,46 @@
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ username, password })
 				});
-				const data = await res.json();
-				const userData = data?.data?.user || data?.user;
-				const token = data?.data?.token || data?.token;
-				const statusText = (data?.status || '').toString().toLowerCase();
-				const messageText = (data?.message || '').toString().toLowerCase();
-				const statusOk = statusText === 'success' || messageText.includes('success') || !!token || !!userData;
-			
-				if (statusOk && userData) {
-					const { _id, username: uname, name } = userData;
-					const displayName = name || uname || 'User';
-					localStorage.setItem('laysUser', JSON.stringify({
-						id: _id,
-						name: displayName,
-						token: token || ''
-					}));
+				const data = await res.json().catch(() => null);
 				
-					loginMsg.textContent = 'Login successful!';
-					loginMsg.style.color = '#22bb33';
-					loginMsg.style.display = 'block';
-				
-					document.getElementById('loginForm').reset();
-					document.getElementById('dropdownMenu').classList.remove('active');
-					
-					setTimeout(() => { loginMsg.style.display = 'none'; }, 1500);
-				} else {
-					loginMsg.textContent = data.message || 'Login failed';
-					loginMsg.style.color = '#b00020';
-					loginMsg.style.display = 'block';
+				if (!res.ok) {
+					const message = (data && (data.message || data.error)) || 'Login failed';
+					throw new Error(message);
 				}
+				
+				// Extract token from data.data.token or fallback paths
+				const token = data?.data?.token || data?.token || data?.jwt || data?.accessToken || data?.access_token || null;
+				const userName = (data && (data.username || data.name || data.user?.username || data.user?.name)) || username;
+				let userId = (data && (data.user?._id || data.user?.id || data._id || data.id)) || null;
+				
+				// If no userId but have token, decode JWT to extract _id
+				if (!userId && token) {
+					const decoded = decodeJWT(token);
+					userId = decoded?._id || decoded?.id || null;
+					console.log('Decoded JWT:', decoded);
+				}
+				
+				console.log('Login - token:', !!token, 'userId:', userId, 'userName:', userName);
+				
+				const user = { name: userName, token: token || null, id: userId || null };
+				
+				localStorage.setItem('laysUser', JSON.stringify(user));
+				console.log('Stored user:', user);
+			
+				loginMsg.textContent = 'Login successful!';
+				loginMsg.style.color = '#22bb33';
+				loginMsg.style.display = 'block';
+			
+				document.getElementById('loginForm').reset();
+				document.getElementById('dropdownMenu').classList.remove('active');
+				updateLoginUI();
+				
+				setTimeout(() => { loginMsg.style.display = 'none'; }, 1500);
 			} catch (err) {
 				loginMsg.textContent = 'Error: ' + err.message;
 				loginMsg.style.color = '#b00020';
 				loginMsg.style.display = 'block';
+				console.error('Login error:', err);
 			}
 		});
 
