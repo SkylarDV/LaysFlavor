@@ -40,6 +40,16 @@
 		.signup-link { text-align:center; padding:6px 16px 0; font-size:12px; }
 		.signup-link a { color:#0066cc; cursor:pointer; font-weight:600; text-decoration:none; }
 		.signup-link a:hover { text-decoration:underline; }
+		.account-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:100; align-items:center; justify-content:center; }
+		.account-modal.active { display:flex; }
+		.account-modal-content { background:#fff; border-radius:12px; padding:32px; max-width:400px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+		.account-modal-title { font-size:22px; font-weight:700; margin-bottom:24px; color:#333; }
+		.account-modal-option { margin-bottom:16px; }
+		.account-modal-option button { width:100%; padding:12px 16px; border:1px solid #ddd; border-radius:8px; background:#fff; cursor:pointer; font-size:14px; transition:all 0.2s; }
+		.account-modal-option button:hover { background:#f5f5f5; border-color:#999; }
+		.account-modal-option button.danger { border-color:#ff4444; color:#ff4444; }
+		.account-modal-option button.danger:hover { background:#ffe6e6; }
+		.account-modal-close { margin-top:16px; width:100%; padding:8px 16px; border:none; background:none; cursor:pointer; color:var(--muted); font-size:14px; }
 		.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; z-index:200; }
 		.modal-hidden { display:none; }
 		.modal-box { background:#fff; border-radius:12px; padding:20px; width:360px; max-width:90vw; box-shadow:0 18px 48px rgba(0,0,0,0.2); position:relative; }
@@ -86,7 +96,8 @@
 					<div id="loginMessage"></div>
 				</form>
 				<div id="loggedInView" style="display:none;">
-					<a class="dropdown-item" id="profileLink" href="/profile.html">Profile</a>
+					<a class="dropdown-item" id="profileLink" href="/profile.html">Your Submissions</a>
+					<button class="dropdown-item" id="manageAccountBtn">Manage Account</button>
 					<button class="dropdown-item" id="logoutBtn">Log out</button>
 				</div>
 				</div>
@@ -461,6 +472,156 @@
 
 		// Initialize on load
 		updateLoginUI();
+
+		// Manage Account Modal
+		const accountModal = document.createElement('div');
+		accountModal.className = 'account-modal';
+		accountModal.id = 'accountModal';
+		accountModal.innerHTML = `
+			<div class="account-modal-content">
+				<div class="account-modal-title">Manage Account</div>
+				<div id="accountModalBody">
+					<div class="account-modal-option">
+						<button id="changePasswordBtn">Change Password</button>
+					</div>
+					<div class="account-modal-option">
+						<button id="deleteAccountBtn" class="danger">Delete Account</button>
+					</div>
+				</div>
+				<div id="changePasswordForm" style="display:none;">
+					<div style="margin-bottom:16px;">
+						<label style="display:block; margin-bottom:6px; font-size:14px; font-weight:600;">Current Password</label>
+						<input type="password" id="currentPassword" placeholder="Enter current password" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:14px;">
+					</div>
+					<div style="margin-bottom:16px;">
+						<label style="display:block; margin-bottom:6px; font-size:14px; font-weight:600;">New Password</label>
+						<input type="password" id="newPassword" placeholder="Enter new password" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:14px;">
+					</div>
+					<div style="margin-bottom:16px;">
+						<label style="display:block; margin-bottom:6px; font-size:14px; font-weight:600;">Confirm Password</label>
+						<input type="password" id="confirmPassword" placeholder="Confirm new password" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:14px;">
+					</div>
+					<div id="passwordMessage" style="margin-bottom:16px; font-size:13px; color:#b00020; min-height:20px;"></div>
+					<button id="submitPasswordBtn" style="width:100%; padding:12px; background:var(--accent); border:none; border-radius:6px; font-weight:700; cursor:pointer; margin-bottom:8px;">Change Password</button>
+					<button id="backToMenuBtn" style="width:100%; padding:8px; background:none; border:1px solid #ddd; border-radius:6px; cursor:pointer; font-size:14px;">Back</button>
+				</div>
+				<button class="account-modal-close" id="closeAccountModal">Close</button>
+			</div>
+		`;
+		document.body.appendChild(accountModal);
+
+		// Open manage account modal
+		document.getElementById('manageAccountBtn').addEventListener('click', (e) => {
+			e.stopPropagation();
+			document.getElementById('dropdownMenu').classList.remove('active');
+			document.getElementById('accountModal').classList.add('active');
+		});
+
+		// Close account modal
+		document.getElementById('closeAccountModal').addEventListener('click', () => {
+			document.getElementById('accountModal').classList.remove('active');
+		});
+
+		// Click outside modal to close
+		document.getElementById('accountModal').addEventListener('click', (e) => {
+			if (e.target.id === 'accountModal') {
+				document.getElementById('accountModal').classList.remove('active');
+			}
+		});
+
+		// Change password button
+		document.getElementById('changePasswordBtn').addEventListener('click', () => {
+			document.getElementById('accountModalBody').style.display = 'none';
+			document.getElementById('changePasswordForm').style.display = 'block';
+		});
+
+		// Back button
+		document.getElementById('backToMenuBtn').addEventListener('click', () => {
+			document.getElementById('changePasswordForm').style.display = 'none';
+			document.getElementById('accountModalBody').style.display = 'block';
+			document.getElementById('currentPassword').value = '';
+			document.getElementById('newPassword').value = '';
+			document.getElementById('confirmPassword').value = '';
+			document.getElementById('passwordMessage').textContent = '';
+		});
+
+		// Submit password change
+		document.getElementById('submitPasswordBtn').addEventListener('click', async () => {
+			const currentPassword = document.getElementById('currentPassword').value;
+			const newPassword = document.getElementById('newPassword').value;
+			const confirmPassword = document.getElementById('confirmPassword').value;
+			const messageEl = document.getElementById('passwordMessage');
+
+			if (!currentPassword || !newPassword || !confirmPassword) {
+				messageEl.textContent = 'All fields are required';
+				messageEl.style.color = '#b00020';
+				return;
+			}
+
+			if (newPassword !== confirmPassword) {
+				messageEl.textContent = 'Passwords do not match';
+				messageEl.style.color = '#b00020';
+				return;
+			}
+
+			try {
+				const user = JSON.parse(localStorage.getItem('laysUser'));
+				const res = await fetch('https://laysflavorapi.onrender.com/api/user/change-password', {
+					method: 'PUT',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': `Bearer ${user.token}`
+					},
+					body: JSON.stringify({ oldPassword: currentPassword, newPassword })
+				});
+				const data = await res.json();
+
+				if (data.status === 'success') {
+					messageEl.textContent = 'Password changed successfully!';
+					messageEl.style.color = '#22bb33';
+					setTimeout(() => {
+						document.getElementById('changePasswordForm').style.display = 'none';
+						document.getElementById('accountModalBody').style.display = 'block';
+						document.getElementById('currentPassword').value = '';
+						document.getElementById('newPassword').value = '';
+						document.getElementById('confirmPassword').value = '';
+						document.getElementById('passwordMessage').textContent = '';
+					}, 1500);
+				} else {
+					messageEl.textContent = data.message || 'Failed to change password';
+					messageEl.style.color = '#b00020';
+				}
+			} catch (err) {
+				messageEl.textContent = 'Error: ' + err.message;
+				messageEl.style.color = '#b00020';
+			}
+		});
+
+		// Delete account
+		document.getElementById('deleteAccountBtn').addEventListener('click', () => {
+			if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
+			if (!confirm('This will permanently delete your account and all your bags. Continue?')) return;
+
+			const user = JSON.parse(localStorage.getItem('laysUser'));
+			fetch(`https://laysflavorapi.onrender.com/api/user/${user.id}`, {
+				method: 'DELETE',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${user.token}`
+				}
+			})
+			.then(res => res.json())
+			.then(data => {
+				if (data.status === 'success') {
+					localStorage.removeItem('laysUser');
+					alert('Account deleted successfully');
+					window.location.href = '/';
+				} else {
+					alert(data.message || 'Failed to delete account');
+				}
+			})
+			.catch(err => alert('Error: ' + err.message));
+		});
 	</script>
 	<script type="module" src="/profile-loader.js"></script>
 </body>
