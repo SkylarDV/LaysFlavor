@@ -1,0 +1,11 @@
+{
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "devCommand": "vite",
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}
