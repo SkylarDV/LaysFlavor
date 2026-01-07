@@ -164,12 +164,20 @@ async function renderBagCard(bag) {
       
       const isLiked = likeBtn.classList.contains('liked');
       
-      // Send vote request
+      console.log('User token:', user.token);
+      
+      // Send vote request - DELETE if already liked, POST if not
+      const method = isLiked ? 'DELETE' : 'POST';
       const res = await fetch(`https://laysflavorapi.onrender.com/api/vote/${bag._id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
         body: JSON.stringify({ userId: user.id })
       });
+      
+      console.log('Response:', res.status, await res.clone().json());
       
       if (!res.ok) throw new Error('Vote failed');
       
@@ -191,6 +199,40 @@ async function renderBagCard(bag) {
   meta.append(nameEl, descEl);
   card.append(canvas, likeBtn, meta);
   gridEl.appendChild(card);
+
+  // Check if user has already voted for this bag
+  const storedUser = localStorage.getItem('laysUser');
+  if (storedUser && bag._id) {
+    try {
+      const user = JSON.parse(storedUser);
+      if (user.id && user.token) {
+        // Fetch all votes and check if this user voted for this bag
+        const voteResponse = await fetch(`https://laysflavorapi.onrender.com/api/vote`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+        
+        if (voteResponse.ok) {
+          const voteData = await voteResponse.json();
+          const votes = voteData.data?.votes || voteData.votes || [];
+          
+          // Check if there's a vote with matching bagId and userId
+          const hasVoted = votes.some(vote => 
+            vote.bagId === bag._id && vote.userId === user.id
+          );
+          
+          if (hasVoted) {
+            likeBtn.classList.add('liked');
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error checking vote status:', e);
+    }
+  }
 
   try {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas });

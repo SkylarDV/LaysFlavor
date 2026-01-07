@@ -215,16 +215,39 @@
 				const likeCount = bag.votes || bag.likes?.length || 0;
 				document.getElementById('likeCount').textContent = likeCount;
 
-				// Check if user has liked
+				// Check if user has already liked this bag
 				const storedUser = localStorage.getItem('laysUser');
 				if (storedUser) {
 					try {
 						const user = JSON.parse(storedUser);
-						if (user.id && (bag.likes?.includes(user.id) || bag.voters?.includes(user.id))) {
-							document.getElementById('likeBtn').classList.add('liked');
-							document.getElementById('likeBtn').textContent = '★ Liked';
+						if (user.id && user.token) {
+							// Fetch all votes and check if this user voted for this bag
+							const voteResponse = await fetch(`https://laysflavorapi.onrender.com/api/vote`, {
+								method: 'GET',
+								headers: {
+									'Content-Type': 'application/json',
+									'Authorization': `Bearer ${user.token}`
+								}
+							});
+							
+							if (voteResponse.ok) {
+								const voteData = await voteResponse.json();
+								const votes = voteData.data?.votes || voteData.votes || [];
+								
+								// Check if there's a vote with matching bagId and userId
+								const hasVoted = votes.some(vote => 
+									vote.bagId === (bag._id || bagId) && vote.userId === user.id
+								);
+								
+								if (hasVoted) {
+									document.getElementById('likeBtn').classList.add('liked');
+									document.getElementById('likeBtn').textContent = '★ Liked';
+								}
+							}
 						}
-					} catch (e) {}
+					} catch (e) {
+						console.error('Error checking vote status:', e);
+					}
 				}
 
 				// Render 3D preview
@@ -380,11 +403,11 @@
 					}
 
 					const isLiked = likeBtn.classList.contains('liked');
-					const endpoint = isLiked ? 'unlike' : 'like';
 
-					// Try the vote endpoint (used in list.js)
+					// Send vote request - DELETE if already liked, POST if not
+					const method = isLiked ? 'DELETE' : 'POST';
 					const response = await fetch(`https://laysflavorapi.onrender.com/api/vote/${bagId}`, {
-						method: 'POST',
+						method,
 						headers: {
 							'Content-Type': 'application/json',
 							'Authorization': `Bearer ${user.token}`

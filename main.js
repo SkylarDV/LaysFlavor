@@ -156,6 +156,7 @@ let imageMesh = null;
 const defaultImagePath = '/assets/chipspreview.png';
 const BAG_SUBMIT_API = 'https://laysflavorapi.onrender.com/api/bag';
 let bagImageData = defaultImagePath;
+let editingBagId = null; // Store the bag ID when in edit mode
 
 function createContainedTextureFromImage(img) {
     const canvasW = 2048;
@@ -277,6 +278,90 @@ new GLTFLoader().load('/assets/chips.glb', (g) => {
     };
     defaultImg.src = defaultImagePath;
 }, undefined, (err) => {});
+
+// Function to load bag data for editing
+async function loadBagForEditing(bagId) {
+    try {
+        const res = await fetch(`${BAG_SUBMIT_API}/${bagId}`);
+        if (!res.ok) throw new Error('Failed to load bag');
+        const data = await res.json();
+        
+        // Extract bag from nested response
+        const bag = data.bag || data.data?.bag || data.data || data;
+        if (!bag) throw new Error('No bag data found');
+        
+        // Set the bag color
+        const colorSwatch = bagColorSwatches.find(b => b.dataset.color === bag.colour);
+        if (colorSwatch) {
+            markSelectedSwatch(colorSwatch);
+            if (bagMaterial) {
+                bagMaterial.color.set(bag.colour);
+            }
+        }
+        
+        // Set the flavor name
+        if (flavorNameInput && bag.name) {
+            flavorNameInput.value = bag.name;
+            updateFlavorText(bag.name);
+        }
+        
+        // Set the text color
+        const textColorSwatch = textColorSwatches.find(b => b.dataset.color === bag.textColour);
+        if (textColorSwatch) {
+            markSelectedTextSwatch(textColorSwatch);
+            if (flavorNameInput) {
+                updateFlavorText(flavorNameInput.value);
+            }
+        }
+        
+        // Set the font
+        if (bagFontSelect && bag.font) {
+            bagFontSelect.value = bag.font;
+            if (flavorNameInput) {
+                updateFlavorText(flavorNameInput.value);
+            }
+        }
+        
+        // Set the flavor description
+        const flavorDescEl = document.getElementById('flavorDesc');
+        if (flavorDescEl && bag.flavor) {
+            flavorDescEl.value = bag.flavor;
+        }
+        
+        // Load the bag image if present
+        if (bag.bagImage && bag.bagImage !== defaultImagePath) {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const texture = createContainedTextureFromImage(img);
+                applyImageTexture(texture);
+                bagImageData = bag.bagImage;
+            };
+            img.onerror = () => {
+                console.error('Failed to load bag image');
+            };
+            img.src = bag.bagImage;
+        }
+        
+    } catch (err) {
+        console.error('Error loading bag for editing:', err);
+        alert('Failed to load bag for editing');
+    }
+}
+
+// Check for edit parameter in URL
+const urlParams = new URLSearchParams(window.location.search);
+const editId = urlParams.get('edit');
+if (editId) {
+    editingBagId = editId;
+    // Wait for model to be fully loaded before populating
+    const checkModelReady = setInterval(() => {
+        if (modelLoaded && bagMaterial && textMesh && imageMesh) {
+            clearInterval(checkModelReady);
+            loadBagForEditing(editId);
+        }
+    }, 100);
+}
 
 if (bagColorSwatches.length) {
     bagColorSwatches.forEach(btn => {
@@ -743,7 +828,8 @@ function buildBagPayload() {
         font: bagFontSelect ? bagFontSelect.value : DEFAULT_FONT,
         bagImage: bagImageData || defaultImagePath,
     };
-    if (currentUser && currentUser.id) {
+    // Only include creator when creating new bags, not when editing
+    if (currentUser && currentUser.id && !editingBagId) {
         payload.creator = currentUser.id;
     }
     return payload;
@@ -761,8 +847,12 @@ async function submitBag() {
         const headers = { 'Content-Type': 'application/json' };
         if (currentUser.token) headers.Authorization = `Bearer ${currentUser.token}`;
 
-        const res = await fetch(BAG_SUBMIT_API, {
-            method: 'POST',
+        // Use PUT for editing existing bag, POST for creating new bag
+        const url = editingBagId ? `${BAG_SUBMIT_API}/${editingBagId}` : BAG_SUBMIT_API;
+        const method = editingBagId ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+            method,
             headers,
             body: JSON.stringify(payload),
         });

@@ -123,7 +123,7 @@ window.renderBagCard = async function (bag) {
     e.stopPropagation();
     // Navigate to configurator with bag ID
     if (bag._id) {
-      window.location.href = `/configurator.html?id=${bag._id}`;
+      window.location.href = `/configurator.html?edit=${bag._id}`;
     }
   });
   
