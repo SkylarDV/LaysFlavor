@@ -212,8 +212,8 @@
 				document.getElementById('textColor').textContent = (bag.textColour || 'white').charAt(0).toUpperCase() + (bag.textColour || 'white').slice(1);
 				document.getElementById('fontStyle').textContent = (bag.font || 'standard').charAt(0).toUpperCase() + (bag.font || 'standard').slice(1);
 				
-				const likeCount = bag.votes || bag.likes?.length || 0;
-				document.getElementById('likeCount').textContent = likeCount;
+				// Fetch vote count from API
+				await updateVoteCount(bag._id || bagId);
 
 				// Check if user has already liked this bag
 				const storedUser = localStorage.getItem('laysUser');
@@ -383,7 +383,46 @@
 			});
 		}
 
-		function setupLikeButton(bagId) {
+		async function updateVoteCount(bagId) {
+			try {
+				const storedUser = localStorage.getItem('laysUser');
+				const user = storedUser ? JSON.parse(storedUser) : null;
+
+				const headers = {
+					'Content-Type': 'application/json'
+				};
+			
+				// Add auth header if user is logged in
+				if (user?.token) {
+					headers['Authorization'] = `Bearer ${user.token}`;
+				}
+
+				const response = await fetch(`https://laysflavorapi.onrender.com/api/vote`, {
+					method: 'GET',
+					headers: headers
+				});
+
+			if (response.ok) {
+				const voteData = await response.json();
+				console.log('Vote data:', voteData);
+				const votes = voteData.data?.votes || voteData.votes || [];
+				console.log('All votes:', votes);
+				console.log('Looking for bagId:', bagId);
+				const bagVotes = votes.filter(vote => {
+					console.log('Comparing vote.bagId:', vote.bagId, 'with bagId:', bagId, 'match:', vote.bagId === bagId || vote.bagId?.toString() === bagId);
+					return vote.bagId === bagId || vote.bagId?.toString() === bagId;
+				});
+				console.log('Filtered bag votes:', bagVotes);
+				document.getElementById('likeCount').textContent = bagVotes.length;
+			} else {
+				console.error('Failed to fetch votes:', response.status);
+			}
+		} catch (e) {
+			console.error('Error fetching vote count:', e);
+		}
+	}
+
+	function setupLikeButton(bagId) {
 			const likeBtn = document.getElementById('likeBtn');
 			const likeCountEl = document.getElementById('likeCount');
 
@@ -419,18 +458,16 @@
 						throw new Error('Failed to update vote');
 					}
 
-					const data = await response.json();
-					const newLikeCount = data.votes || data.likes?.length || 0;
-					likeCountEl.textContent = newLikeCount;
-
-					// Toggle the UI
+					// Toggle the UI first
+					isLiked = !isLiked;
 					likeBtn.classList.toggle('liked');
 					if (likeBtn.classList.contains('liked')) {
 						likeBtn.textContent = '★ Liked';
 					} else {
 						likeBtn.textContent = '★ Like';
 					}
-
+				// Update vote count from API
+				await updateVoteCount(bagId);
 				} catch (error) {
 					console.error('Error toggling like:', error);
 					alert('Failed to update like. Please try again.');
