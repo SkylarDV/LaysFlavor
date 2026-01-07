@@ -118,6 +118,14 @@ function cloneModel(gltf) {
 async function renderBagCard(bag) {
   const card = document.createElement('div');
   card.className = 'card';
+  card.style.cursor = 'pointer';
+  
+  // Add click handler to redirect to preview page
+  card.addEventListener('click', (e) => {
+    // Don't redirect if clicking the like button
+    if (e.target.closest('.like-btn')) return;
+    window.location.href = `/preview.html?id=${bag._id}`;
+  });
   
   // Create canvas with explicit styling
   const canvas = document.createElement('canvas');

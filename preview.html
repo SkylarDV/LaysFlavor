@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Preview Bag - Lays Flavor Gallery</title>
+	<style>
+		:root {
+			--bg: #f8f5ec;
+			--card: #ffffff;
+			--text: #1d1c1a;
+			--muted: #5b554f;
+			--accent: #ffc800;
+		}
+		* { box-sizing: border-box; }
+		body { margin:0; font-family:"Helvetica Neue", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; background:var(--bg); color:var(--text); }
+		header { padding:24px 28px; display:flex; align-items:center; justify-content:space-between; gap:16px; position:sticky; top:0; background:rgba(248,245,236,0.95); backdrop-filter: blur(10px); border-bottom:1px solid rgba(0,0,0,0.06); z-index:10; }
+		h1 { margin:0; font-size:22px; letter-spacing:-0.3px; }
+		.cta { display:inline-flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; border:1px solid rgba(0,0,0,0.08); background:#fff; color:var(--text); text-decoration:none; font-weight:700; }
+		.cta:hover { background:#fff7d9; }
+		.header-nav { display:flex; align-items:center; gap:12px; }
+		main { padding:40px 24px; max-width:1200px; margin:0 auto; }
+		.preview-container { display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:start; }
+		.preview-canvas-wrapper { background:var(--card); border-radius:14px; padding:20px; box-shadow:0 8px 24px rgba(0,0,0,0.08); }
+		canvas#previewCanvas { width:100%; height:500px; border-radius:10px; background:linear-gradient(135deg, #fdf7de, #fff); display:block; }
+		.preview-details { background:var(--card); border-radius:14px; padding:24px; box-shadow:0 8px 24px rgba(0,0,0,0.08); }
+		.preview-details h2 { margin:0 0 16px 0; font-size:28px; font-weight:800; }
+		.detail-section { margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid rgba(0,0,0,0.06); }
+		.detail-section:last-child { border-bottom:none; }
+		.detail-label { font-size:13px; color:var(--muted); font-weight:600; margin-bottom:6px; }
+		.detail-value { font-size:15px; color:var(--text); }
+		.color-display { width:40px; height:40px; border-radius:8px; border:1px solid rgba(0,0,0,0.12); display:inline-block; vertical-align:middle; margin-right:8px; }
+		.creator-info { display:flex; align-items:center; gap:10px; }
+		.creator-avatar { width:40px; height:40px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:700; color:#000; }
+		.like-section { display:flex; align-items:center; gap:12px; margin-top:20px; }
+		.like-btn { padding:12px 20px; border:none; border-radius:10px; background:var(--accent); color:#000; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.1); transition: all 0.2s ease; font-size:16px; }
+		.like-btn:hover { background:#ffb700; transform: translateY(-1px); }
+		.like-btn.liked { background:#22bb33; color:#fff; }
+		.like-count { font-size:18px; font-weight:700; color:var(--muted); }
+		.status { text-align:center; padding:40px 20px; color:var(--muted); font-size:16px; }
+		.error { color:#b00020; }
+		.loading { display:flex; align-items:center; justify-content:center; gap:12px; }
+		.spinner { width:24px; height:24px; border:3px solid rgba(0,0,0,0.1); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+		@keyframes spin { to { transform:rotate(360deg); } }
+		@media (max-width: 768px) {
+			.preview-container { grid-template-columns:1fr; }
+		}
+	</style>
+</head>
+<body>
+	<header>
+		<h1>Preview Bag Design</h1>
+		<div class="header-nav">
+			<a class="cta" href="/">Back to gallery</a>
+			<a class="cta" href="/configurator.html">Create your own</a>
+		</div>
+	</header>
+	<main>
+		<div id="status" class="status loading">
+			<div class="spinner"></div>
+			<span>Loading bag preview…</span>
+		</div>
+		<div id="previewContainer" class="preview-container" style="display:none;">
+			<div class="preview-canvas-wrapper">
+				<canvas id="previewCanvas"></canvas>
+			</div>
+			<div class="preview-details">
+				<h2 id="bagName">Flavor Name</h2>
+				<div class="detail-section">
+					<div class="detail-label">Description</div>
+					<div class="detail-value" id="bagDescription">No description provided</div>
+				</div>
+				<div class="detail-section">
+					<div class="detail-label">Bag Color</div>
+					<div class="detail-value">
+						<span class="color-display" id="bagColorDisplay"></span>
+						<span id="bagColorText">#000000</span>
+					</div>
+				</div>
+				<div class="detail-section">
+					<div class="detail-label">Text Color</div>
+					<div class="detail-value" id="textColor">White</div>
+				</div>
+				<div class="detail-section">
+					<div class="detail-label">Font Style</div>
+					<div class="detail-value" id="fontStyle">Standard</div>
+				</div>
+				<div class="like-section">
+					<button class="like-btn" id="likeBtn">★ Like</button>
+					<span class="like-count"><span id="likeCount">0</span> likes</span>
+				</div>
+			</div>
+		</div>
+	</main>
+	<script type="module">
+		import * as THREE from 'three';
+		import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+		const API_URL = 'https://laysflavorapi.onrender.com/api/bag';
+		const MODEL_PATH = '/assets/chips.glb';
+		
+		const FONT_STACKS = {
+			standard: 'bold 300px "Helvetica Neue", Helvetica, Arial, "Segoe UI", system-ui, sans-serif',
+			decorative: 'bold 300px "Segoe Script", "Kaushan Script", "Courgette", "Sacramento", cursive',
+			classic: 'bold 300px Georgia, "Times New Roman", Times, serif'
+		};
+
+		function resolveFont(alias) {
+			return FONT_STACKS[alias] || FONT_STACKS.standard;
+		}
+
+		function createTextTexture(text, color = 'white', fontAlias = 'standard') {
+			const canvas = document.createElement('canvas');
+			canvas.width = 2048;
+			canvas.height = 1024;
+			const ctx = canvas.getContext('2d');
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			ctx.save();
+			ctx.scale(1, -1.5);
+			ctx.fillStyle = color === 'black' ? '#000' : '#fff';
+			ctx.font = resolveFont(fontAlias);
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.fillText(text || '', canvas.width / 2, -canvas.height / 2);
+			ctx.restore();
+			const tex = new THREE.CanvasTexture(canvas);
+			tex.colorSpace = THREE.SRGBColorSpace;
+			return tex;
+		}
+
+		function createContainedTextureFromImage(img) {
+			const canvasW = 2048;
+			const canvasH = 2048;
+			const canvas = document.createElement('canvas');
+			canvas.width = canvasW;
+			canvas.height = canvasH;
+			const ctx = canvas.getContext('2d');
+			ctx.clearRect(0, 0, canvasW, canvasH);
+			ctx.save();
+			ctx.translate(0, canvasH);
+			ctx.scale(1, -1);
+			const scale = Math.min(canvasW / img.naturalWidth, canvasH / img.naturalHeight);
+			const drawW = img.naturalWidth * scale;
+			const drawH = img.naturalHeight * scale;
+			const dx = (canvasW - drawW) / 2;
+			const dy = (canvasH - drawH) / 2;
+			ctx.drawImage(img, dx, dy, drawW, drawH);
+			ctx.restore();
+			const texture = new THREE.CanvasTexture(canvas);
+			texture.colorSpace = THREE.SRGBColorSpace;
+			texture.needsUpdate = true;
+			return texture;
+		}
+
+		function loadImage(src) {
+			return new Promise((resolve, reject) => {
+				const img = new Image();
+				img.crossOrigin = 'anonymous';
+				img.onload = () => resolve(img);
+				img.onerror = reject;
+				img.src = src;
+			});
+		}
+
+		// Get bag ID from URL
+		const urlParams = new URLSearchParams(window.location.search);
+		const bagId = urlParams.get('id');
+
+		if (!bagId) {
+			document.getElementById('status').innerHTML = '<span class="error">No bag ID provided</span>';
+		} else {
+			loadBagPreview(bagId);
+		}
+
+		async function loadBagPreview(bagId) {
+			try {
+				// Fetch bag data - try individual bag endpoint first, then fall back to fetching all
+				let bag = null;
+				
+				try {
+					const response = await fetch(`${API_URL}/${bagId}`);
+					if (response.ok) {
+						const data = await response.json();
+						// Handle nested response: data.bag or data.data.bag
+						bag = data.bag || data.data?.bag || data;
+					}
+				} catch (e) {
+					console.warn('Individual bag fetch failed, trying list:', e);
+				}
+				
+				// Fallback: fetch all bags and find the one we need
+				if (!bag || !bag._id) {
+					const response = await fetch(API_URL);
+					if (!response.ok) throw new Error('Failed to fetch bags');
+					const data = await response.json();
+					const bags = Array.isArray(data) ? data : (data?.bags || data?.data?.bags || []);
+					bag = bags.find(b => b._id === bagId);
+					if (!bag) throw new Error('Bag not found');
+				}
+
+				console.log('Loaded bag:', bag);
+
+				// Hide status, show preview
+				document.getElementById('status').style.display = 'none';
+				document.getElementById('previewContainer').style.display = 'grid';
+
+				// Update details - use correct field names from API
+				document.getElementById('bagName').textContent = bag.name || 'Unnamed Flavor';
+				document.getElementById('bagDescription').textContent = bag.flavor || bag.description || 'No description provided';
+				document.getElementById('bagColorDisplay').style.background = bag.colour || '#b6352a';
+				document.getElementById('bagColorText').textContent = bag.colour || '#b6352a';
+				document.getElementById('textColor').textContent = (bag.textColour || 'white').charAt(0).toUpperCase() + (bag.textColour || 'white').slice(1);
+				document.getElementById('fontStyle').textContent = (bag.font || 'standard').charAt(0).toUpperCase() + (bag.font || 'standard').slice(1);
+				
+				const likeCount = bag.votes || bag.likes?.length || 0;
+				document.getElementById('likeCount').textContent = likeCount;
+
+				// Check if user has liked
+				const storedUser = localStorage.getItem('laysUser');
+				if (storedUser) {
+					try {
+						const user = JSON.parse(storedUser);
+						if (user.id && (bag.likes?.includes(user.id) || bag.voters?.includes(user.id))) {
+							document.getElementById('likeBtn').classList.add('liked');
+							document.getElementById('likeBtn').textContent = '★ Liked';
+						}
+					} catch (e) {}
+				}
+
+				// Render 3D preview
+				await render3DPreview(bag);
+
+				// Setup like button
+				setupLikeButton(bag._id || bagId);
+
+			} catch (error) {
+				console.error('Error loading bag:', error);
+				document.getElementById('status').innerHTML = `<span class="error">Error: ${error.message}</span>`;
+				document.getElementById('status').style.display = 'block';
+			}
+		}
+
+		async function render3DPreview(bag) {
+			const canvas = document.getElementById('previewCanvas');
+			const scene = new THREE.Scene();
+			scene.background = new THREE.Color('#f8f5ec');
+
+			const camera = new THREE.PerspectiveCamera(35, canvas.offsetWidth / canvas.offsetHeight, 0.1, 100);
+			camera.position.set(0.2, 0.5, 3);
+
+			const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+			renderer.setSize(canvas.offsetWidth, canvas.offsetHeight);
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.outputEncoding = THREE.sRGBEncoding;
+			renderer.setClearColor(0xf8f5ec, 1);
+
+			// Lighting
+			scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
+			const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+			dir.position.set(2, 8, 6);
+			scene.add(dir);
+
+			// Load model
+			const loader = new GLTFLoader();
+			loader.load(MODEL_PATH, async (gltf) => {
+				const model = gltf.scene.clone(true);
+
+				// Center and scale the model
+				const box = new THREE.Box3().setFromObject(model);
+				const center = box.getCenter(new THREE.Vector3());
+				model.position.sub(center);
+				const size = box.getSize(new THREE.Vector3());
+				const maxDim = Math.max(size.x, size.y, size.z) || 1;
+				model.scale.setScalar((1 / maxDim) * 2.2);
+				model.position.set(0, 0.2, -0.6);
+				model.rotation.x = Math.PI / 12;
+				model.rotation.y = 0; // Face front
+
+				let meshIndex = 0;
+				let bagMat = null;
+				let textMesh = null;
+				let imageMesh = null;
+
+				// Apply materials using mesh index like list.js does
+				model.traverse((n) => {
+					if (n.isMesh) {
+						if (!bagMat) {
+							bagMat = new THREE.MeshStandardMaterial({ 
+								color: new THREE.Color(bag.colour || '#b6352a'), 
+								metalness: 0.1, 
+								roughness: 0.3 
+							});
+							n.material = bagMat;
+						}
+						if (meshIndex === 2) {
+							textMesh = n;
+							textMesh.material = new THREE.MeshStandardMaterial({ 
+								transparent: true, 
+								opacity: 1, 
+								metalness: 0.1, 
+								roughness: 0.3 
+							});
+						}
+						if (meshIndex === 3) {
+							imageMesh = n;
+							imageMesh.material = new THREE.MeshBasicMaterial({ 
+								transparent: true, 
+								opacity: 0, 
+								toneMapped: false 
+							});
+						}
+						meshIndex++;
+					}
+				});
+
+				// Apply bag color
+				if (bagMat && bag.colour) {
+					bagMat.color.set(bag.colour);
+				}
+
+				// Apply text texture
+				if (textMesh) {
+					const textTex = createTextTexture(
+						bag.name || 'Classic',
+						(bag.textColour || 'white').toLowerCase(),
+						bag.font || 'standard'
+					);
+					textMesh.material.map = textTex;
+					textMesh.material.needsUpdate = true;
+				}
+
+				scene.add(model);
+				renderer.render(scene, camera);
+
+				// Load image async
+				if (imageMesh && bag.bagImage) {
+					try {
+						const img = await loadImage(bag.bagImage);
+						const imageTexture = createContainedTextureFromImage(img);
+						imageMesh.material.map = imageTexture;
+						imageMesh.material.opacity = 1;
+						imageMesh.material.needsUpdate = true;
+						renderer.render(scene, camera);
+					} catch (e) {
+						console.warn('Failed to load bag image:', e);
+					}
+				}
+
+				// Static render - no animation
+				renderer.render(scene, camera);
+			});
+
+			// Handle resize
+			window.addEventListener('resize', () => {
+				const width = canvas.offsetWidth;
+				const height = canvas.offsetHeight;
+				camera.aspect = width / height;
+				camera.updateProjectionMatrix();
+				renderer.setSize(width, height);
+			});
+		}
+
+		function setupLikeButton(bagId) {
+			const likeBtn = document.getElementById('likeBtn');
+			const likeCountEl = document.getElementById('likeCount');
+
+			likeBtn.addEventListener('click', async () => {
+				const storedUser = localStorage.getItem('laysUser');
+				if (!storedUser) {
+					alert('Please log in to like this bag');
+					window.location.href = '/?login=true';
+					return;
+				}
+
+				try {
+					const user = JSON.parse(storedUser);
+					if (!user.id) {
+						alert('User ID not found');
+						return;
+					}
+
+					const isLiked = likeBtn.classList.contains('liked');
+					const endpoint = isLiked ? 'unlike' : 'like';
+
+					// Try the vote endpoint (used in list.js)
+					const response = await fetch(`https://laysflavorapi.onrender.com/api/vote/${bagId}`, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+							'Authorization': `Bearer ${user.token}`
+						},
+						body: JSON.stringify({ userId: user.id })
+					});
+
+					if (!response.ok) {
+						throw new Error('Failed to update vote');
+					}
+
+					const data = await response.json();
+					const newLikeCount = data.votes || data.likes?.length || 0;
+					likeCountEl.textContent = newLikeCount;
+
+					// Toggle the UI
+					likeBtn.classList.toggle('liked');
+					if (likeBtn.classList.contains('liked')) {
+						likeBtn.textContent = '★ Liked';
+					} else {
+						likeBtn.textContent = '★ Like';
+					}
+
+				} catch (error) {
+					console.error('Error toggling like:', error);
+					alert('Failed to update like. Please try again.');
+				}
+			});
+		}
+	</script>
+</body>
+</html>
