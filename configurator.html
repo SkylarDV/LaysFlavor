@@ -125,6 +125,19 @@
 
       #loginForm { display:flex; flex-direction:column; gap:12px; }
       #loginStatus { font-size:13px; color:#444; }
+      .signup-link { text-align:center; padding:6px 0; font-size:12px; }
+      .signup-link a { color:#0066cc; cursor:pointer; font-weight:600; text-decoration:none; }
+      .signup-link a:hover { text-decoration:underline; }
+      .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; z-index:200; }
+      .modal-hidden { display:none; }
+      .modal-box { background:#fff; border-radius:12px; padding:20px; width:360px; max-width:90vw; box-shadow:0 18px 48px rgba(0,0,0,0.2); position:relative; }
+      .modal-box h3 { margin:0 0 10px 0; font-size:18px; }
+      .modal-box form { display:flex; flex-direction:column; gap:10px; }
+      .modal-box input { width:100%; padding:10px; border:1px solid rgba(0,0,0,0.12); border-radius:8px; font-size:14px; }
+      .modal-box button[type="submit"] { background:#ffc800; border:none; border-radius:8px; padding:10px; font-weight:700; cursor:pointer; }
+      .modal-box button[type="submit"]:hover { background:#ffb700; }
+      .modal-close { position:absolute; top:10px; right:12px; background:none; border:none; font-size:18px; cursor:pointer; }
+      #signupMessage { font-size:12px; color:#b00020; min-height:14px; }
       
       #resetBtn { 
         position: fixed;
@@ -292,6 +305,7 @@
               <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" required>
             </div>
             <button type="submit" class="modal-btn confirm">Log In</button>
+            <div class="signup-link"><a href="#" id="openSignup">Don't have an account? Sign up</a></div>
           </form>
           <button id="logoutBtn" type="button">Log Out</button>
         </div>
@@ -306,6 +320,21 @@
           <button class="modal-btn confirm" id="confirmSubmit">Yes, Submit</button>
           <button class="modal-btn cancel" id="cancelSubmit">Cancel</button>
         </div>
+      </div>
+    </div>
+
+    <div id="signupModal" class="modal-overlay modal-hidden">
+      <div class="modal-box" id="signupBox">
+        <button class="modal-close" id="closeSignup" aria-label="Close">×</button>
+        <h3>Create an account</h3>
+        <form id="signupForm">
+          <input type="text" id="signupUsername" placeholder="Username" autocomplete="username" required />
+          <input type="email" id="signupEmail" placeholder="Email" autocomplete="email" required />
+          <input type="password" id="signupPassword" placeholder="Password" autocomplete="new-password" required />
+          <input type="password" id="signupConfirm" placeholder="Confirm password" autocomplete="new-password" required />
+          <button type="submit">Sign up</button>
+          <div id="signupMessage"></div>
+        </form>
       </div>
     </div>
 
@@ -371,6 +400,70 @@
           bagImageInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
       }, false);
+      
+      // Open signup modal
+      document.getElementById('openSignup').addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('signupModal').classList.remove('modal-hidden');
+      });
+      
+      // Close signup modal
+      function closeSignupModal() {
+        document.getElementById('signupForm').reset();
+        document.getElementById('signupMessage').textContent = '';
+        document.getElementById('signupModal').classList.add('modal-hidden');
+      }
+      
+      document.getElementById('closeSignup').addEventListener('click', closeSignupModal);
+      
+      // Close on outside click
+      document.getElementById('signupModal').addEventListener('click', (e) => {
+        if (e.target.id === 'signupModal') closeSignupModal();
+      });
+      
+      // Signup form submission
+      document.getElementById('signupForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('signupUsername').value.trim();
+        const email = document.getElementById('signupEmail').value.trim();
+        const password = document.getElementById('signupPassword').value.trim();
+        const confirm = document.getElementById('signupConfirm').value.trim();
+        const signupMsg = document.getElementById('signupMessage');
+        
+        if (password !== confirm) {
+          signupMsg.textContent = 'Passwords do not match';
+          signupMsg.style.color = '#b00020';
+          return;
+        }
+        
+        signupMsg.textContent = 'Creating account...';
+        signupMsg.style.color = '#1d1c1a';
+        
+        try {
+          const res = await fetch('https://laysflavorapi.onrender.com/api/user/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password })
+          });
+          const data = await res.json().catch(() => null);
+          
+          if (!res.ok) {
+            const message = (data && (data.message || data.error)) || 'Signup failed';
+            throw new Error(message);
+          }
+          
+          signupMsg.textContent = 'Account created! You can now log in.';
+          signupMsg.style.color = '#22bb33';
+          
+          setTimeout(() => {
+            closeSignupModal();
+          }, 2000);
+        } catch (err) {
+          signupMsg.textContent = 'Error: ' + err.message;
+          signupMsg.style.color = '#b00020';
+        }
+      });
     </script>
   </body>
 </html>
